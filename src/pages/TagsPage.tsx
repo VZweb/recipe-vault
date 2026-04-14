@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Palette, Plus, Tags, Trash2 } from "lucide-react";
+import { Plus, Tags, Trash2 } from "lucide-react";
 import { useTags } from "@/hooks/useTags";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -11,7 +11,7 @@ import { TAG_COLORS } from "@/types/tag";
 export function TagsPage() {
   const { tags, add, remove } = useTags();
   const [newName, setNewName] = useState("");
-  const [newColor, setNewColor] = useState(TAG_COLORS[0]);
+  const [newColor, setNewColor] = useState<string>(TAG_COLORS[0]);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const handleAdd = async (e: React.FormEvent) => {
@@ -56,7 +56,7 @@ export function TagsPage() {
                     ? "ring-2 ring-offset-2 scale-110"
                     : "hover:scale-105"
                 }`}
-                style={{ backgroundColor: c, ringColor: c }}
+                style={{ backgroundColor: c, ["--tw-ring-color" as string]: c }}
                 aria-label={`Select color ${c}`}
               />
             ))}
