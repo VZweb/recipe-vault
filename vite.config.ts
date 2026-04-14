@@ -11,6 +11,7 @@ export default defineConfig({
     VitePWA({
       registerType: "autoUpdate",
       includeAssets: ["icons/favicon.svg"],
+      selfDestroying: true,
       manifest: {
         name: "Recipe Vault",
         short_name: "RecipeVault",
