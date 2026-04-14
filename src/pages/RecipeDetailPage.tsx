@@ -1,20 +1,24 @@
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import {
   ArrowLeft,
+  Check,
   Clock,
   Copy,
   Edit,
   ExternalLink,
+  Play,
   Trash2,
   Users,
 } from "lucide-react";
 import { useRecipe, useRecipeMutations } from "@/hooks/useRecipes";
 import { useTags } from "@/hooks/useTags";
+import { fetchPantryItems } from "@/lib/firestore";
 import { Button } from "@/components/ui/Button";
 import { TagChip } from "@/components/ui/TagChip";
 import { Spinner } from "@/components/ui/Spinner";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import type { PantryItem } from "@/types/pantry";
 
 export function RecipeDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -24,6 +28,37 @@ export function RecipeDetailPage() {
   const { remove, create } = useRecipeMutations();
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [imageIdx, setImageIdx] = useState(0);
+  const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
+
+  const loadPantry = useCallback(async () => {
+    const items = await fetchPantryItems();
+    setPantryItems(items);
+  }, []);
+
+  useEffect(() => {
+    void loadPantry();
+  }, [loadPantry]);
+
+  const pantryNames = useMemo(() => {
+    const normalize = (s: string) => s.toLowerCase().trim().replace(/\s+/g, " ");
+    return pantryItems.flatMap((p) => {
+      const names = [normalize(p.name)];
+      if (p.nameSecondary) names.push(normalize(p.nameSecondary));
+      return names;
+    });
+  }, [pantryItems]);
+
+  const isInPantry = useCallback(
+    (name: string, nameSecondary?: string) => {
+      const normalize = (s: string) => s.toLowerCase().trim().replace(/\s+/g, " ");
+      const candidates = [normalize(name)];
+      if (nameSecondary?.trim()) candidates.push(normalize(nameSecondary));
+      return pantryNames.some((p) =>
+        candidates.some((c) => c.includes(p) || p.includes(c))
+      );
+    },
+    [pantryNames]
+  );
 
   if (loading) {
     return (
@@ -61,6 +96,7 @@ export function RecipeDetailPage() {
       prepTimeMin: recipe.prepTimeMin,
       cookTimeMin: recipe.cookTimeMin,
       sourceUrl: recipe.sourceUrl,
+      videoUrl: recipe.videoUrl,
       imageUrls: recipe.imageUrls,
       tags: recipe.tags,
       ingredients: recipe.ingredients,
@@ -177,16 +213,31 @@ export function RecipeDetailPage() {
           </div>
         )}
 
-        {recipe.sourceUrl && (
-          <a
-            href={recipe.sourceUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-3 inline-flex items-center gap-1 text-sm text-brand-600 hover:text-brand-700"
-          >
-            <ExternalLink size={14} />
-            View original source
-          </a>
+        {(recipe.sourceUrl || recipe.videoUrl) && (
+          <div className="mt-3 flex flex-wrap items-center gap-4">
+            {recipe.sourceUrl && (
+              <a
+                href={recipe.sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-sm text-brand-600 hover:text-brand-700"
+              >
+                <ExternalLink size={14} />
+                View original source
+              </a>
+            )}
+            {recipe.videoUrl && (
+              <a
+                href={recipe.videoUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-sm text-red-600 hover:text-red-700"
+              >
+                <Play size={14} />
+                Watch video
+              </a>
+            )}
+          </div>
         )}
       </div>
 
@@ -194,32 +245,58 @@ export function RecipeDetailPage() {
       <div className="grid gap-8 lg:grid-cols-[1fr_2fr]">
         {/* Ingredients */}
         <div>
-          <h2 className="text-lg font-semibold text-stone-800 mb-3">
-            Ingredients
-          </h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold text-stone-800">
+              Ingredients
+            </h2>
+            {pantryItems.length > 0 && (
+              <span className="text-xs text-stone-400">
+                {recipe.ingredients.filter((ing) => isInPantry(ing.name, ing.nameSecondary)).length}
+                /{recipe.ingredients.length} in pantry
+              </span>
+            )}
+          </div>
           <ul className="space-y-2">
             {recipe.ingredients
               .sort((a, b) => a.sortOrder - b.sortOrder)
-              .map((ing, i) => (
-                <li
-                  key={i}
-                  className="flex items-start gap-3 rounded-lg px-3 py-2 hover:bg-stone-50 transition-colors"
-                >
-                  <input
-                    type="checkbox"
-                    className="mt-0.5 h-4 w-4 rounded border-stone-300 text-brand-600 focus:ring-brand-500"
-                  />
-                  <span className="text-sm text-stone-700">
-                    {ing.quantity && (
-                      <span className="font-medium">{ing.quantity} </span>
+              .map((ing, i) => {
+                const inPantry = isInPantry(ing.name, ing.nameSecondary);
+                return (
+                  <li
+                    key={i}
+                    className={`flex items-start gap-3 rounded-lg px-3 py-2 transition-colors ${
+                      inPantry
+                        ? "bg-green-50 hover:bg-green-100/70"
+                        : "hover:bg-stone-50"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 h-4 w-4 rounded border-stone-300 text-brand-600 focus:ring-brand-500"
+                    />
+                    <span className="text-sm flex-1">
+                      {ing.quantity && (
+                        <span className="font-medium">{ing.quantity} </span>
+                      )}
+                      {ing.unit && (
+                        <span className="text-stone-500">{ing.unit} </span>
+                      )}
+                      <span className="text-stone-700">{ing.name}</span>
+                      {ing.nameSecondary && (
+                        <span className="ml-1.5 italic text-stone-400">
+                          ({ing.nameSecondary})
+                        </span>
+                      )}
+                    </span>
+                    {inPantry && (
+                      <span className="mt-0.5 flex items-center gap-1 text-[10px] font-medium text-green-700 bg-green-100 rounded-full px-1.5 py-0.5 whitespace-nowrap">
+                        <Check size={10} />
+                        In pantry
+                      </span>
                     )}
-                    {ing.unit && (
-                      <span className="text-stone-500">{ing.unit} </span>
-                    )}
-                    {ing.name}
-                  </span>
-                </li>
-              ))}
+                  </li>
+                );
+              })}
           </ul>
         </div>
 

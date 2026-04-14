@@ -6,6 +6,7 @@ import {
   ChevronsDownUp,
   ChevronsUpDown,
   ImagePlus,
+  Link,
   Package,
   Pencil,
   Plus,
@@ -34,6 +35,8 @@ interface EditState {
   imageFile: File | null;
   imagePreview: string | null;
   removeImage: boolean;
+  imageUrlInput: string;
+  showImageUrlInput: boolean;
 }
 
 export function PantryPage() {
@@ -47,6 +50,8 @@ export function PantryPage() {
   const [newIsStaple, setNewIsStaple] = useState(false);
   const [newImageFile, setNewImageFile] = useState<File | null>(null);
   const [newImagePreview, setNewImagePreview] = useState<string | null>(null);
+  const [newImageUrl, setNewImageUrl] = useState("");
+  const [showNewImageUrlInput, setShowNewImageUrlInput] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(
@@ -79,6 +84,8 @@ export function PantryPage() {
     setNewImageFile(null);
     if (newImagePreview) URL.revokeObjectURL(newImagePreview);
     setNewImagePreview(null);
+    setNewImageUrl("");
+    setShowNewImageUrlInput(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
     if (cameraInputRef.current) cameraInputRef.current.value = "";
   };
@@ -113,6 +120,9 @@ export function PantryPage() {
       let imageUrl: string | null = null;
       if (newImageFile) {
         imageUrl = await uploadPantryImage(id, newImageFile);
+        await updatePantryItem(id, { imageUrl });
+      } else if (newImageUrl.trim()) {
+        imageUrl = newImageUrl.trim();
         await updatePantryItem(id, { imageUrl });
       }
 
@@ -167,6 +177,8 @@ export function PantryPage() {
       imageFile: null,
       imagePreview: null,
       removeImage: false,
+      imageUrlInput: "",
+      showImageUrlInput: false,
     });
   };
 
@@ -231,6 +243,10 @@ export function PantryPage() {
       } else if (editState.imageFile) {
         if (item.imageUrl) await deletePantryImage(item.imageUrl);
         newImageUrl = await uploadPantryImage(item.id, editState.imageFile);
+        updates.imageUrl = newImageUrl;
+      } else if (editState.imageUrlInput.trim()) {
+        if (item.imageUrl) await deletePantryImage(item.imageUrl);
+        newImageUrl = editState.imageUrlInput.trim();
         updates.imageUrl = newImageUrl;
       }
 
@@ -416,13 +432,22 @@ export function PantryPage() {
               <Camera size={16} />
               Camera
             </button>
+            <button
+              type="button"
+              onClick={() => setShowNewImageUrlInput((v) => !v)}
+              className="flex items-center gap-1.5 rounded-lg border border-stone-300 px-3 py-2 text-sm text-stone-600 hover:bg-stone-50 transition-colors"
+              title="Add image from URL"
+            >
+              <Link size={16} />
+              URL
+            </button>
           </div>
 
           {/* Image preview */}
-          {newImagePreview && (
+          {(newImagePreview || newImageUrl.trim()) && (
             <div className="relative">
               <img
-                src={newImagePreview}
+                src={newImagePreview ?? newImageUrl.trim()}
                 alt="Preview"
                 className="h-12 w-12 rounded-lg object-cover border border-stone-200"
               />
@@ -447,6 +472,27 @@ export function PantryPage() {
             </Button>
           </div>
         </div>
+
+        {/* Image URL input */}
+        {showNewImageUrlInput && (
+          <div className="flex gap-2">
+            <input
+              type="url"
+              placeholder="Paste image URL (https://...)"
+              value={newImageUrl}
+              onChange={(e) => {
+                setNewImageUrl(e.target.value);
+                if (newImageFile) {
+                  setNewImageFile(null);
+                  if (newImagePreview) URL.revokeObjectURL(newImagePreview);
+                  setNewImagePreview(null);
+                }
+              }}
+              className="flex-1 rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-colors"
+              autoFocus
+            />
+          </div>
+        )}
       </form>
 
       {/* Grouped list */}
@@ -568,82 +614,138 @@ export function PantryPage() {
                           </div>
 
                           {/* Edit: Photo */}
-                          <div className="flex items-center gap-3">
-                            <input
-                              ref={editFileInputRef}
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (file) handleEditImageSelected(file);
-                              }}
-                            />
-                            <input
-                              ref={editCameraInputRef}
-                              type="file"
-                              accept="image/*"
-                              capture="environment"
-                              className="hidden"
-                              onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (file) handleEditImageSelected(file);
-                              }}
-                            />
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-3">
+                              <input
+                                ref={editFileInputRef}
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) handleEditImageSelected(file);
+                                }}
+                              />
+                              <input
+                                ref={editCameraInputRef}
+                                type="file"
+                                accept="image/*"
+                                capture="environment"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) handleEditImageSelected(file);
+                                }}
+                              />
 
-                            {/* Current / new photo preview */}
-                            {editState.imagePreview ? (
-                              <div className="relative">
-                                <img
-                                  src={editState.imagePreview}
-                                  alt="New photo"
-                                  className="h-12 w-12 rounded-lg object-cover border border-stone-200"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={handleEditRemoveImage}
-                                  className="absolute -top-1.5 -right-1.5 rounded-full bg-stone-700 p-0.5 text-white hover:bg-red-500 transition-colors"
-                                >
-                                  <X size={12} />
-                                </button>
-                              </div>
-                            ) : !editState.removeImage && item.imageUrl ? (
-                              <div className="relative">
-                                <img
-                                  src={item.imageUrl}
-                                  alt={item.name}
-                                  className="h-12 w-12 rounded-lg object-cover border border-stone-200"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={handleEditRemoveImage}
-                                  className="absolute -top-1.5 -right-1.5 rounded-full bg-stone-700 p-0.5 text-white hover:bg-red-500 transition-colors"
-                                >
-                                  <X size={12} />
-                                </button>
-                              </div>
-                            ) : null}
+                              {/* Current / new photo preview */}
+                              {editState.imagePreview ? (
+                                <div className="relative">
+                                  <img
+                                    src={editState.imagePreview}
+                                    alt="New photo"
+                                    className="h-12 w-12 rounded-lg object-cover border border-stone-200"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={handleEditRemoveImage}
+                                    className="absolute -top-1.5 -right-1.5 rounded-full bg-stone-700 p-0.5 text-white hover:bg-red-500 transition-colors"
+                                  >
+                                    <X size={12} />
+                                  </button>
+                                </div>
+                              ) : editState.imageUrlInput.trim() ? (
+                                <div className="relative">
+                                  <img
+                                    src={editState.imageUrlInput.trim()}
+                                    alt="URL preview"
+                                    className="h-12 w-12 rounded-lg object-cover border border-stone-200"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setEditState((s) =>
+                                        s ? { ...s, imageUrlInput: "", showImageUrlInput: false, removeImage: true } : s
+                                      )
+                                    }
+                                    className="absolute -top-1.5 -right-1.5 rounded-full bg-stone-700 p-0.5 text-white hover:bg-red-500 transition-colors"
+                                  >
+                                    <X size={12} />
+                                  </button>
+                                </div>
+                              ) : !editState.removeImage && item.imageUrl ? (
+                                <div className="relative">
+                                  <img
+                                    src={item.imageUrl}
+                                    alt={item.name}
+                                    className="h-12 w-12 rounded-lg object-cover border border-stone-200"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={handleEditRemoveImage}
+                                    className="absolute -top-1.5 -right-1.5 rounded-full bg-stone-700 p-0.5 text-white hover:bg-red-500 transition-colors"
+                                  >
+                                    <X size={12} />
+                                  </button>
+                                </div>
+                              ) : null}
 
-                            <button
-                              type="button"
-                              onClick={() => editFileInputRef.current?.click()}
-                              className="flex items-center gap-1.5 rounded-lg border border-stone-300 px-2.5 py-1.5 text-xs text-stone-600 hover:bg-stone-50 transition-colors"
-                            >
-                              <ImagePlus size={14} />
-                              {item.imageUrl && !editState.removeImage && !editState.imageFile
-                                ? "Replace"
-                                : "Photo"}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                editCameraInputRef.current?.click()
-                              }
-                              className="flex items-center gap-1.5 rounded-lg border border-stone-300 px-2.5 py-1.5 text-xs text-stone-600 hover:bg-stone-50 transition-colors"
-                            >
-                              <Camera size={14} />
-                              Camera
-                            </button>
+                              <button
+                                type="button"
+                                onClick={() => editFileInputRef.current?.click()}
+                                className="flex items-center gap-1.5 rounded-lg border border-stone-300 px-2.5 py-1.5 text-xs text-stone-600 hover:bg-stone-50 transition-colors"
+                              >
+                                <ImagePlus size={14} />
+                                {item.imageUrl && !editState.removeImage && !editState.imageFile
+                                  ? "Replace"
+                                  : "Photo"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  editCameraInputRef.current?.click()
+                                }
+                                className="flex items-center gap-1.5 rounded-lg border border-stone-300 px-2.5 py-1.5 text-xs text-stone-600 hover:bg-stone-50 transition-colors"
+                              >
+                                <Camera size={14} />
+                                Camera
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setEditState((s) =>
+                                    s ? { ...s, showImageUrlInput: !s.showImageUrlInput, imageUrlInput: "" } : s
+                                  )
+                                }
+                                className="flex items-center gap-1.5 rounded-lg border border-stone-300 px-2.5 py-1.5 text-xs text-stone-600 hover:bg-stone-50 transition-colors"
+                                title="Add image from URL"
+                              >
+                                <Link size={14} />
+                                URL
+                              </button>
+                            </div>
+                            {editState.showImageUrlInput && (
+                              <input
+                                type="url"
+                                placeholder="Paste image URL (https://...)"
+                                value={editState.imageUrlInput}
+                                onChange={(e) =>
+                                  setEditState((s) =>
+                                    s
+                                      ? {
+                                          ...s,
+                                          imageUrlInput: e.target.value,
+                                          imageFile: null,
+                                          imagePreview: null,
+                                          removeImage: false,
+                                        }
+                                      : s
+                                  )
+                                }
+                                className="w-full rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-colors"
+                                autoFocus
+                              />
+                            )}
                           </div>
 
                           {/* Edit: Actions */}

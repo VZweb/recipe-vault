@@ -1,5 +1,6 @@
 export interface Ingredient {
   name: string;
+  nameSecondary: string;
   quantity: number | null;
   unit: string;
   sortOrder: number;
@@ -19,6 +20,7 @@ export interface Recipe {
   prepTimeMin: number | null;
   cookTimeMin: number | null;
   sourceUrl: string;
+  videoUrl: string;
   imageUrls: string[];
   tags: string[];
   ingredients: Ingredient[];

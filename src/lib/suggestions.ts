@@ -35,9 +35,10 @@ export function suggestRecipes(
     const missing: string[] = [];
 
     for (const ing of recipe.ingredients) {
-      const ingName = normalize(ing.name);
-      const isAvailable = Array.from(available).some(
-        (a) => ingName.includes(a) || a.includes(ingName)
+      const candidates = [normalize(ing.name)];
+      if (ing.nameSecondary?.trim()) candidates.push(normalize(ing.nameSecondary));
+      const isAvailable = Array.from(available).some((a) =>
+        candidates.some((c) => c.includes(a) || a.includes(c))
       );
 
       if (isAvailable) {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, GripVertical, ImagePlus, Plus, Trash2, X } from "lucide-react";
+import { ArrowLeft, GripVertical, ImagePlus, Link, Plus, Trash2, X } from "lucide-react";
 import { useRecipe, useRecipeMutations } from "@/hooks/useRecipes";
 import { useTags } from "@/hooks/useTags";
 import { useImageUpload } from "@/hooks/useImageUpload";
@@ -12,7 +12,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import type { Ingredient, Step, RecipeFormData } from "@/types/recipe";
 
 function emptyIngredient(sortOrder: number): Ingredient {
-  return { name: "", quantity: null, unit: "", sortOrder };
+  return { name: "", nameSecondary: "", quantity: null, unit: "", sortOrder };
 }
 
 function emptyStep(sortOrder: number): Step {
@@ -26,6 +26,7 @@ const defaultForm: RecipeFormData = {
   prepTimeMin: null,
   cookTimeMin: null,
   sourceUrl: "",
+  videoUrl: "",
   imageUrls: [],
   tags: [],
   ingredients: [emptyIngredient(0)],
@@ -44,6 +45,8 @@ export function RecipeEditorPage() {
   const [form, setForm] = useState<RecipeFormData>(defaultForm);
   const [saving, setSaving] = useState(false);
   const [previewImages, setPreviewImages] = useState<string[]>([]);
+  const [imageUrlInput, setImageUrlInput] = useState("");
+  const [showImageUrlInput, setShowImageUrlInput] = useState(false);
 
   useEffect(() => {
     if (recipe && isEditing) {
@@ -54,6 +57,7 @@ export function RecipeEditorPage() {
         prepTimeMin: recipe.prepTimeMin,
         cookTimeMin: recipe.cookTimeMin,
         sourceUrl: recipe.sourceUrl,
+        videoUrl: recipe.videoUrl,
         imageUrls: recipe.imageUrls,
         tags: recipe.tags,
         ingredients:
@@ -161,6 +165,15 @@ export function RecipeEditorPage() {
       "imageUrls",
       form.imageUrls.filter((_, i) => i !== idx)
     );
+  };
+
+  const addImageByUrl = () => {
+    const url = imageUrlInput.trim();
+    if (!url) return;
+    setPreviewImages((prev) => [...prev, url]);
+    setField("imageUrls", [...form.imageUrls, url]);
+    setImageUrlInput("");
+    setShowImageUrlInput(false);
   };
 
   // --- Submit ---
@@ -283,6 +296,13 @@ export function RecipeEditorPage() {
             onChange={(e) => setField("sourceUrl", e.target.value)}
           />
         </div>
+        <Input
+          label="Video URL"
+          type="url"
+          placeholder="https://youtube.com/watch?v=..."
+          value={form.videoUrl}
+          onChange={(e) => setField("videoUrl", e.target.value)}
+        />
       </section>
 
       {/* Images */}
@@ -307,7 +327,7 @@ export function RecipeEditorPage() {
             ) : (
               <>
                 <ImagePlus size={20} />
-                <span className="mt-1 text-[10px]">Add</span>
+                <span className="mt-1 text-[10px]">Upload</span>
               </>
             )}
             <input
@@ -319,7 +339,41 @@ export function RecipeEditorPage() {
               disabled={uploading}
             />
           </label>
+          <button
+            type="button"
+            onClick={() => setShowImageUrlInput((v) => !v)}
+            className="flex h-24 w-24 flex-col items-center justify-center rounded-lg border-2 border-dashed border-stone-300 text-stone-400 hover:border-brand-400 hover:text-brand-500 transition-colors"
+          >
+            <Link size={20} />
+            <span className="mt-1 text-[10px]">URL</span>
+          </button>
         </div>
+        {showImageUrlInput && (
+          <div className="flex gap-2">
+            <input
+              type="url"
+              placeholder="Paste image URL (https://...)"
+              value={imageUrlInput}
+              onChange={(e) => setImageUrlInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addImageByUrl();
+                }
+              }}
+              className="flex-1 rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-colors"
+              autoFocus
+            />
+            <Button
+              type="button"
+              size="sm"
+              onClick={addImageByUrl}
+              disabled={!imageUrlInput.trim()}
+            >
+              Add
+            </Button>
+          </div>
+        )}
       </section>
 
       {/* Tags */}
@@ -381,6 +435,13 @@ export function RecipeEditorPage() {
                 value={ing.name}
                 onChange={(e) => updateIngredient(idx, { name: e.target.value })}
                 className="flex-1 rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+              />
+              <input
+                type="text"
+                placeholder="Greek name"
+                value={ing.nameSecondary}
+                onChange={(e) => updateIngredient(idx, { nameSecondary: e.target.value })}
+                className="w-28 rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-sm italic text-stone-500 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
               />
               <button
                 type="button"
