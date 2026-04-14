@@ -1,0 +1,759 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  Camera,
+  ChevronDown,
+  ChevronRight,
+  ChevronsDownUp,
+  ChevronsUpDown,
+  ImagePlus,
+  Package,
+  Pencil,
+  Plus,
+  Trash2,
+  X,
+} from "lucide-react";
+import {
+  fetchPantryItems,
+  addPantryItem,
+  updatePantryItem,
+  deletePantryItem,
+} from "@/lib/firestore";
+import { uploadPantryImage, deletePantryImage } from "@/lib/storage";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Spinner } from "@/components/ui/Spinner";
+import { EmptyState } from "@/components/ui/EmptyState";
+import type { PantryItem, PantryCategory } from "@/types/pantry";
+import { PANTRY_CATEGORIES, PANTRY_UNITS } from "@/types/pantry";
+
+interface EditState {
+  name: string;
+  nameSecondary: string;
+  quantity: string;
+  unit: string;
+  imageFile: File | null;
+  imagePreview: string | null;
+  removeImage: boolean;
+}
+
+export function PantryPage() {
+  const [items, setItems] = useState<PantryItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [newName, setNewName] = useState("");
+  const [newNameSecondary, setNewNameSecondary] = useState("");
+  const [newCategory, setNewCategory] = useState<PantryCategory>("Other");
+  const [newQuantity, setNewQuantity] = useState("");
+  const [newUnit, setNewUnit] = useState("");
+  const [newIsStaple, setNewIsStaple] = useState(false);
+  const [newImageFile, setNewImageFile] = useState<File | null>(null);
+  const [newImagePreview, setNewImagePreview] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(
+    new Set()
+  );
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editState, setEditState] = useState<EditState | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const editFileInputRef = useRef<HTMLInputElement>(null);
+  const editCameraInputRef = useRef<HTMLInputElement>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await fetchPantryItems();
+      setItems(data);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const clearImageSelection = () => {
+    setNewImageFile(null);
+    if (newImagePreview) URL.revokeObjectURL(newImagePreview);
+    setNewImagePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (cameraInputRef.current) cameraInputRef.current.value = "";
+  };
+
+  const handleImageSelected = (file: File) => {
+    if (newImagePreview) URL.revokeObjectURL(newImagePreview);
+    setNewImageFile(file);
+    setNewImagePreview(URL.createObjectURL(file));
+  };
+
+  const handleAdd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newName.trim()) return;
+
+    setSubmitting(true);
+    try {
+      const qty = newQuantity ? Number(newQuantity) : null;
+      const unit = newUnit || null;
+      const nameSecondary = newNameSecondary.trim() || null;
+
+      const id = await addPantryItem({
+        name: newName.trim(),
+        nameSecondary,
+        normalizedName: newName.trim().toLowerCase(),
+        category: newCategory,
+        quantity: qty,
+        unit,
+        isStaple: newIsStaple,
+        imageUrl: null,
+      });
+
+      let imageUrl: string | null = null;
+      if (newImageFile) {
+        imageUrl = await uploadPantryImage(id, newImageFile);
+        await updatePantryItem(id, { imageUrl });
+      }
+
+      setItems((prev) => [
+        ...prev,
+        {
+          id,
+          name: newName.trim(),
+          nameSecondary,
+          normalizedName: newName.trim().toLowerCase(),
+          category: newCategory,
+          quantity: qty,
+          unit,
+          isStaple: newIsStaple,
+          imageUrl,
+          addedAt: new Date(),
+        },
+      ]);
+
+      setNewName("");
+      setNewNameSecondary("");
+      setNewQuantity("");
+      setNewUnit("");
+      setNewIsStaple(false);
+      clearImageSelection();
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleToggleStaple = async (item: PantryItem) => {
+    await updatePantryItem(item.id, { isStaple: !item.isStaple });
+    setItems((prev) =>
+      prev.map((i) =>
+        i.id === item.id ? { ...i, isStaple: !i.isStaple } : i
+      )
+    );
+  };
+
+  const handleDelete = async (id: string) => {
+    await deletePantryItem(id);
+    setItems((prev) => prev.filter((i) => i.id !== id));
+  };
+
+  const startEditing = (item: PantryItem) => {
+    setEditingItemId(item.id);
+    setEditState({
+      name: item.name,
+      nameSecondary: item.nameSecondary ?? "",
+      quantity: item.quantity?.toString() ?? "",
+      unit: item.unit ?? "",
+      imageFile: null,
+      imagePreview: null,
+      removeImage: false,
+    });
+  };
+
+  const cancelEditing = () => {
+    if (editState?.imagePreview) URL.revokeObjectURL(editState.imagePreview);
+    setEditingItemId(null);
+    setEditState(null);
+  };
+
+  const handleEditImageSelected = (file: File) => {
+    setEditState((prev) => {
+      if (!prev) return prev;
+      if (prev.imagePreview) URL.revokeObjectURL(prev.imagePreview);
+      return {
+        ...prev,
+        imageFile: file,
+        imagePreview: URL.createObjectURL(file),
+        removeImage: false,
+      };
+    });
+  };
+
+  const handleEditRemoveImage = () => {
+    setEditState((prev) => {
+      if (!prev) return prev;
+      if (prev.imagePreview) URL.revokeObjectURL(prev.imagePreview);
+      return {
+        ...prev,
+        imageFile: null,
+        imagePreview: null,
+        removeImage: true,
+      };
+    });
+  };
+
+  const saveEdit = async (item: PantryItem) => {
+    if (!editState || !editState.name.trim()) return;
+    setSaving(true);
+    try {
+      const updates: Partial<PantryItem> = {};
+      const trimmedName = editState.name.trim();
+      const trimmedSecondary = editState.nameSecondary.trim() || null;
+      const qty = editState.quantity ? Number(editState.quantity) : null;
+      const unit = editState.unit || null;
+
+      if (trimmedName !== item.name) {
+        updates.name = trimmedName;
+        updates.normalizedName = trimmedName.toLowerCase();
+      }
+      if (trimmedSecondary !== item.nameSecondary) {
+        updates.nameSecondary = trimmedSecondary;
+      }
+      if (qty !== item.quantity) updates.quantity = qty;
+      if (unit !== item.unit) updates.unit = unit;
+
+      let newImageUrl = item.imageUrl;
+
+      if (editState.removeImage && item.imageUrl) {
+        await deletePantryImage(item.imageUrl);
+        updates.imageUrl = null;
+        newImageUrl = null;
+      } else if (editState.imageFile) {
+        if (item.imageUrl) await deletePantryImage(item.imageUrl);
+        newImageUrl = await uploadPantryImage(item.id, editState.imageFile);
+        updates.imageUrl = newImageUrl;
+      }
+
+      if (Object.keys(updates).length > 0) {
+        await updatePantryItem(item.id, updates);
+      }
+
+      setItems((prev) =>
+        prev.map((i) =>
+          i.id === item.id
+            ? {
+                ...i,
+                name: trimmedName,
+                nameSecondary: trimmedSecondary,
+                normalizedName: trimmedName.toLowerCase(),
+                quantity: qty,
+                unit,
+                imageUrl: newImageUrl,
+              }
+            : i
+        )
+      );
+      cancelEditing();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const toggleCategory = (cat: string) => {
+    setCollapsedCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(cat)) next.delete(cat);
+      else next.add(cat);
+      return next;
+    });
+  };
+
+  const collapseAll = () => {
+    setCollapsedCategories(new Set(Object.keys(grouped)));
+  };
+
+  const expandAll = () => {
+    setCollapsedCategories(new Set());
+  };
+
+  const grouped = PANTRY_CATEGORIES.reduce(
+    (acc, cat) => {
+      const catItems = items.filter((i) => i.category === cat);
+      if (catItems.length > 0) acc[cat] = catItems;
+      return acc;
+    },
+    {} as Record<string, PantryItem[]>
+  );
+
+  const categoryKeys = Object.keys(grouped);
+  const allCollapsed = categoryKeys.length > 0 && categoryKeys.every((k) => collapsedCategories.has(k));
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-24">
+        <Spinner className="h-8 w-8" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-2xl font-bold text-stone-800">My Pantry</h1>
+
+      {/* Quick add form */}
+      <form
+        onSubmit={handleAdd}
+        className="space-y-3 rounded-xl border border-stone-200 bg-white p-4"
+      >
+        {/* Row 1: Name + Greek name */}
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex-1">
+            <Input
+              placeholder="Item name (e.g., chicken breast, olive oil...)"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+            />
+          </div>
+          <div className="flex-1">
+            <Input
+              placeholder="Greek name (optional)"
+              value={newNameSecondary}
+              onChange={(e) => setNewNameSecondary(e.target.value)}
+            />
+          </div>
+        </div>
+
+        {/* Row 2: Category, Quantity, Unit */}
+        <div className="flex flex-col sm:flex-row gap-3">
+          <select
+            value={newCategory}
+            onChange={(e) =>
+              setNewCategory(e.target.value as PantryCategory)
+            }
+            className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-700 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+          >
+            {PANTRY_CATEGORIES.map((cat) => (
+              <option key={cat} value={cat}>
+                {cat}
+              </option>
+            ))}
+          </select>
+
+          <input
+            type="number"
+            min="0"
+            step="any"
+            placeholder="Qty"
+            value={newQuantity}
+            onChange={(e) => setNewQuantity(e.target.value)}
+            className="w-20 rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-700 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+          />
+
+          <select
+            value={newUnit}
+            onChange={(e) => setNewUnit(e.target.value)}
+            className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-700 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+          >
+            <option value="">Unit</option>
+            {PANTRY_UNITS.map((u) => (
+              <option key={u} value={u}>
+                {u}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Row 3: Staple + Photo + Submit */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+          <label className="flex items-center gap-2 text-sm text-stone-600 whitespace-nowrap">
+            <input
+              type="checkbox"
+              checked={newIsStaple}
+              onChange={(e) => setNewIsStaple(e.target.checked)}
+              className="h-4 w-4 rounded border-stone-300 text-brand-600 focus:ring-brand-500"
+            />
+            Staple
+          </label>
+
+          {/* Photo buttons */}
+          <div className="flex items-center gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleImageSelected(file);
+              }}
+            />
+            <input
+              ref={cameraInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleImageSelected(file);
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center gap-1.5 rounded-lg border border-stone-300 px-3 py-2 text-sm text-stone-600 hover:bg-stone-50 transition-colors"
+              title="Choose photo"
+            >
+              <ImagePlus size={16} />
+              Photo
+            </button>
+            <button
+              type="button"
+              onClick={() => cameraInputRef.current?.click()}
+              className="flex items-center gap-1.5 rounded-lg border border-stone-300 px-3 py-2 text-sm text-stone-600 hover:bg-stone-50 transition-colors"
+              title="Take photo with camera"
+            >
+              <Camera size={16} />
+              Camera
+            </button>
+          </div>
+
+          {/* Image preview */}
+          {newImagePreview && (
+            <div className="relative">
+              <img
+                src={newImagePreview}
+                alt="Preview"
+                className="h-12 w-12 rounded-lg object-cover border border-stone-200"
+              />
+              <button
+                type="button"
+                onClick={clearImageSelection}
+                className="absolute -top-1.5 -right-1.5 rounded-full bg-stone-700 p-0.5 text-white hover:bg-red-500 transition-colors"
+              >
+                <X size={12} />
+              </button>
+            </div>
+          )}
+
+          <div className="sm:ml-auto">
+            <Button type="submit" disabled={!newName.trim() || submitting}>
+              {submitting ? (
+                <Spinner className="h-4 w-4" />
+              ) : (
+                <Plus size={16} />
+              )}
+              {submitting ? "Adding..." : "Add"}
+            </Button>
+          </div>
+        </div>
+      </form>
+
+      {/* Grouped list */}
+      {categoryKeys.length > 0 ? (
+        <div className="space-y-4">
+          {/* Expand / Collapse all */}
+          <div className="flex justify-end">
+            <button
+              onClick={allCollapsed ? expandAll : collapseAll}
+              className="flex items-center gap-1.5 text-xs text-stone-500 hover:text-stone-700 transition-colors"
+            >
+              {allCollapsed ? (
+                <>
+                  <ChevronsUpDown size={14} />
+                  Expand all
+                </>
+              ) : (
+                <>
+                  <ChevronsDownUp size={14} />
+                  Collapse all
+                </>
+              )}
+            </button>
+          </div>
+
+          {Object.entries(grouped).map(([category, catItems]) => {
+            const isCollapsed = collapsedCategories.has(category);
+            return (
+              <section key={category}>
+                <button
+                  onClick={() => toggleCategory(category)}
+                  className="flex w-full items-center gap-2 mb-2 group"
+                >
+                  {isCollapsed ? (
+                    <ChevronRight
+                      size={16}
+                      className="text-stone-400 group-hover:text-stone-600 transition-colors"
+                    />
+                  ) : (
+                    <ChevronDown
+                      size={16}
+                      className="text-stone-400 group-hover:text-stone-600 transition-colors"
+                    />
+                  )}
+                  <h2 className="text-sm font-semibold uppercase tracking-wider text-stone-500 group-hover:text-stone-700 transition-colors">
+                    {category}
+                  </h2>
+                  <span className="text-xs text-stone-400">
+                    ({catItems.length})
+                  </span>
+                </button>
+
+                {!isCollapsed && (
+                  <div className="space-y-1">
+                    {catItems.map((item) =>
+                      editingItemId === item.id && editState ? (
+                        <div
+                          key={item.id}
+                          className="space-y-3 rounded-lg border-2 border-brand-300 bg-brand-50/30 px-4 py-3"
+                        >
+                          {/* Edit: Names */}
+                          <div className="flex flex-col sm:flex-row gap-2">
+                            <input
+                              value={editState.name}
+                              onChange={(e) =>
+                                setEditState((s) =>
+                                  s ? { ...s, name: e.target.value } : s
+                                )
+                              }
+                              placeholder="Item name"
+                              className="flex-1 rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                              autoFocus
+                            />
+                            <input
+                              value={editState.nameSecondary}
+                              onChange={(e) =>
+                                setEditState((s) =>
+                                  s
+                                    ? { ...s, nameSecondary: e.target.value }
+                                    : s
+                                )
+                              }
+                              placeholder="Greek name (optional)"
+                              className="flex-1 rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                            />
+                          </div>
+
+                          {/* Edit: Quantity + Unit */}
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="number"
+                              min="0"
+                              step="any"
+                              placeholder="Qty"
+                              value={editState.quantity}
+                              onChange={(e) =>
+                                setEditState((s) =>
+                                  s ? { ...s, quantity: e.target.value } : s
+                                )
+                              }
+                              className="w-20 rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-700 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                            />
+                            <select
+                              value={editState.unit}
+                              onChange={(e) =>
+                                setEditState((s) =>
+                                  s ? { ...s, unit: e.target.value } : s
+                                )
+                              }
+                              className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-700 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                            >
+                              <option value="">Unit</option>
+                              {PANTRY_UNITS.map((u) => (
+                                <option key={u} value={u}>
+                                  {u}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {/* Edit: Photo */}
+                          <div className="flex items-center gap-3">
+                            <input
+                              ref={editFileInputRef}
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handleEditImageSelected(file);
+                              }}
+                            />
+                            <input
+                              ref={editCameraInputRef}
+                              type="file"
+                              accept="image/*"
+                              capture="environment"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handleEditImageSelected(file);
+                              }}
+                            />
+
+                            {/* Current / new photo preview */}
+                            {editState.imagePreview ? (
+                              <div className="relative">
+                                <img
+                                  src={editState.imagePreview}
+                                  alt="New photo"
+                                  className="h-12 w-12 rounded-lg object-cover border border-stone-200"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={handleEditRemoveImage}
+                                  className="absolute -top-1.5 -right-1.5 rounded-full bg-stone-700 p-0.5 text-white hover:bg-red-500 transition-colors"
+                                >
+                                  <X size={12} />
+                                </button>
+                              </div>
+                            ) : !editState.removeImage && item.imageUrl ? (
+                              <div className="relative">
+                                <img
+                                  src={item.imageUrl}
+                                  alt={item.name}
+                                  className="h-12 w-12 rounded-lg object-cover border border-stone-200"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={handleEditRemoveImage}
+                                  className="absolute -top-1.5 -right-1.5 rounded-full bg-stone-700 p-0.5 text-white hover:bg-red-500 transition-colors"
+                                >
+                                  <X size={12} />
+                                </button>
+                              </div>
+                            ) : null}
+
+                            <button
+                              type="button"
+                              onClick={() => editFileInputRef.current?.click()}
+                              className="flex items-center gap-1.5 rounded-lg border border-stone-300 px-2.5 py-1.5 text-xs text-stone-600 hover:bg-stone-50 transition-colors"
+                            >
+                              <ImagePlus size={14} />
+                              {item.imageUrl && !editState.removeImage && !editState.imageFile
+                                ? "Replace"
+                                : "Photo"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                editCameraInputRef.current?.click()
+                              }
+                              className="flex items-center gap-1.5 rounded-lg border border-stone-300 px-2.5 py-1.5 text-xs text-stone-600 hover:bg-stone-50 transition-colors"
+                            >
+                              <Camera size={14} />
+                              Camera
+                            </button>
+                          </div>
+
+                          {/* Edit: Actions */}
+                          <div className="flex items-center gap-2 pt-1">
+                            <button
+                              onClick={() => saveEdit(item)}
+                              disabled={
+                                !editState.name.trim() || saving
+                              }
+                              className="flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50 transition-colors"
+                            >
+                              {saving && (
+                                <Spinner className="h-3 w-3" />
+                              )}
+                              Save
+                            </button>
+                            <button
+                              onClick={cancelEditing}
+                              disabled={saving}
+                              className="rounded-lg px-3 py-1.5 text-xs text-stone-500 hover:bg-stone-100 transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div
+                          key={item.id}
+                          className="flex items-center justify-between rounded-lg border border-stone-200 bg-white px-4 py-2.5"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            {item.imageUrl && (
+                              <img
+                                src={item.imageUrl}
+                                alt={item.name}
+                                className="h-9 w-9 rounded-md object-cover border border-stone-200 flex-shrink-0"
+                              />
+                            )}
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-sm text-stone-800">
+                                  {item.name}
+                                </span>
+                                {item.nameSecondary && (
+                                  <span className="text-sm italic text-stone-400">
+                                    ({item.nameSecondary})
+                                  </span>
+                                )}
+                                {item.isStaple && (
+                                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+                                    Staple
+                                  </span>
+                                )}
+                              </div>
+                              {(item.quantity != null || item.unit) && (
+                                <span className="text-xs text-stone-400 mt-0.5 block">
+                                  {item.quantity}
+                                  {item.unit ? ` ${item.unit}` : ""}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <button
+                              onClick={() => startEditing(item)}
+                              className="p-1 text-stone-400 hover:text-brand-600 transition-colors"
+                              title="Edit item"
+                            >
+                              <Pencil size={14} />
+                            </button>
+                            <button
+                              onClick={() => handleToggleStaple(item)}
+                              className={`text-xs px-2 py-1 rounded transition-colors ${
+                                item.isStaple
+                                  ? "text-amber-600 hover:bg-amber-50"
+                                  : "text-stone-400 hover:bg-stone-50"
+                              }`}
+                              title={
+                                item.isStaple
+                                  ? "Remove staple"
+                                  : "Mark as staple"
+                              }
+                            >
+                              {item.isStaple ? "Unstaple" : "Staple"}
+                            </button>
+                            <button
+                              onClick={() => handleDelete(item.id)}
+                              className="p-1 text-stone-400 hover:text-red-500 transition-colors"
+                              aria-label={`Remove ${item.name}`}
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    )}
+                  </div>
+                )}
+              </section>
+            );
+          })}
+        </div>
+      ) : (
+        <EmptyState
+          icon={<Package size={48} />}
+          title="Pantry is empty"
+          description="Add items you have at home. Mark staples like salt and oil so they're always counted."
+        />
+      )}
+    </div>
+  );
+}

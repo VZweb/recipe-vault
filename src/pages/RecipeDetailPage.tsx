@@ -1,0 +1,267 @@
+import { useState } from "react";
+import { useParams, useNavigate, Link } from "react-router-dom";
+import {
+  ArrowLeft,
+  Clock,
+  Copy,
+  Edit,
+  ExternalLink,
+  Trash2,
+  Users,
+} from "lucide-react";
+import { useRecipe, useRecipeMutations } from "@/hooks/useRecipes";
+import { useTags } from "@/hooks/useTags";
+import { Button } from "@/components/ui/Button";
+import { TagChip } from "@/components/ui/TagChip";
+import { Spinner } from "@/components/ui/Spinner";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+
+export function RecipeDetailPage() {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { recipe, loading, error } = useRecipe(id);
+  const { tags } = useTags();
+  const { remove, create } = useRecipeMutations();
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [imageIdx, setImageIdx] = useState(0);
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-24">
+        <Spinner className="h-8 w-8" />
+      </div>
+    );
+  }
+
+  if (error || !recipe) {
+    return (
+      <div className="py-16 text-center">
+        <p className="text-stone-500">Recipe not found.</p>
+        <Link to="/recipes" className="mt-4 inline-block">
+          <Button variant="secondary">Back to Recipes</Button>
+        </Link>
+      </div>
+    );
+  }
+
+  const recipeTags = tags.filter((t) => recipe.tags.includes(t.id));
+  const totalTime =
+    (recipe.prepTimeMin ?? 0) + (recipe.cookTimeMin ?? 0) || null;
+
+  const handleDelete = async () => {
+    await remove(recipe.id);
+    navigate("/recipes");
+  };
+
+  const handleDuplicate = async () => {
+    const newId = await create({
+      title: `${recipe.title} (copy)`,
+      description: recipe.description,
+      servings: recipe.servings,
+      prepTimeMin: recipe.prepTimeMin,
+      cookTimeMin: recipe.cookTimeMin,
+      sourceUrl: recipe.sourceUrl,
+      imageUrls: recipe.imageUrls,
+      tags: recipe.tags,
+      ingredients: recipe.ingredients,
+      steps: recipe.steps,
+    });
+    navigate(`/recipes/${newId}`);
+  };
+
+  return (
+    <div className="space-y-8">
+      {/* Back + Actions */}
+      <div className="flex items-center justify-between">
+        <Link
+          to="/recipes"
+          className="flex items-center gap-1 text-sm text-stone-500 hover:text-stone-700 transition-colors"
+        >
+          <ArrowLeft size={16} />
+          Back to recipes
+        </Link>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={handleDuplicate}>
+            <Copy size={16} />
+            <span className="hidden sm:inline">Duplicate</span>
+          </Button>
+          <Link to={`/recipes/${recipe.id}/edit`}>
+            <Button variant="secondary" size="sm">
+              <Edit size={16} />
+              <span className="hidden sm:inline">Edit</span>
+            </Button>
+          </Link>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="!text-red-500 hover:!bg-red-50"
+            onClick={() => setDeleteOpen(true)}
+          >
+            <Trash2 size={16} />
+          </Button>
+        </div>
+      </div>
+
+      {/* Hero Image */}
+      {recipe.imageUrls.length > 0 && (
+        <div className="space-y-2">
+          <div className="aspect-[16/9] overflow-hidden rounded-xl bg-stone-100">
+            <img
+              src={recipe.imageUrls[imageIdx]}
+              alt={recipe.title}
+              className="h-full w-full object-cover"
+            />
+          </div>
+          {recipe.imageUrls.length > 1 && (
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {recipe.imageUrls.map((url, i) => (
+                <button
+                  key={i}
+                  onClick={() => setImageIdx(i)}
+                  className={`h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg border-2 transition-colors ${
+                    i === imageIdx
+                      ? "border-brand-500"
+                      : "border-transparent hover:border-stone-300"
+                  }`}
+                >
+                  <img
+                    src={url}
+                    alt={`${recipe.title} ${i + 1}`}
+                    className="h-full w-full object-cover"
+                  />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Title + Meta */}
+      <div>
+        <h1 className="text-3xl font-bold text-stone-900">{recipe.title}</h1>
+        {recipe.description && (
+          <p className="mt-2 text-stone-600">{recipe.description}</p>
+        )}
+
+        <div className="mt-4 flex flex-wrap items-center gap-4 text-sm text-stone-500">
+          {recipe.prepTimeMin && (
+            <span className="flex items-center gap-1.5">
+              <Clock size={16} />
+              Prep: {recipe.prepTimeMin} min
+            </span>
+          )}
+          {recipe.cookTimeMin && (
+            <span className="flex items-center gap-1.5">
+              <Clock size={16} />
+              Cook: {recipe.cookTimeMin} min
+            </span>
+          )}
+          {totalTime && (
+            <span className="font-medium text-stone-700">
+              Total: {totalTime} min
+            </span>
+          )}
+          {recipe.servings && (
+            <span className="flex items-center gap-1.5">
+              <Users size={16} />
+              {recipe.servings} servings
+            </span>
+          )}
+        </div>
+
+        {recipeTags.length > 0 && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {recipeTags.map((tag) => (
+              <TagChip key={tag.id} name={tag.name} color={tag.color} />
+            ))}
+          </div>
+        )}
+
+        {recipe.sourceUrl && (
+          <a
+            href={recipe.sourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-3 inline-flex items-center gap-1 text-sm text-brand-600 hover:text-brand-700"
+          >
+            <ExternalLink size={14} />
+            View original source
+          </a>
+        )}
+      </div>
+
+      {/* Ingredients + Steps */}
+      <div className="grid gap-8 lg:grid-cols-[1fr_2fr]">
+        {/* Ingredients */}
+        <div>
+          <h2 className="text-lg font-semibold text-stone-800 mb-3">
+            Ingredients
+          </h2>
+          <ul className="space-y-2">
+            {recipe.ingredients
+              .sort((a, b) => a.sortOrder - b.sortOrder)
+              .map((ing, i) => (
+                <li
+                  key={i}
+                  className="flex items-start gap-3 rounded-lg px-3 py-2 hover:bg-stone-50 transition-colors"
+                >
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 h-4 w-4 rounded border-stone-300 text-brand-600 focus:ring-brand-500"
+                  />
+                  <span className="text-sm text-stone-700">
+                    {ing.quantity && (
+                      <span className="font-medium">{ing.quantity} </span>
+                    )}
+                    {ing.unit && (
+                      <span className="text-stone-500">{ing.unit} </span>
+                    )}
+                    {ing.name}
+                  </span>
+                </li>
+              ))}
+          </ul>
+        </div>
+
+        {/* Steps */}
+        <div>
+          <h2 className="text-lg font-semibold text-stone-800 mb-3">Steps</h2>
+          <ol className="space-y-6">
+            {recipe.steps
+              .sort((a, b) => a.sortOrder - b.sortOrder)
+              .map((step, i) => (
+                <li key={i} className="flex gap-4">
+                  <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-brand-100 text-sm font-semibold text-brand-700">
+                    {i + 1}
+                  </span>
+                  <div className="flex-1 space-y-2">
+                    <p className="text-sm text-stone-700 leading-relaxed">
+                      {step.instruction}
+                    </p>
+                    {step.imageUrl && (
+                      <img
+                        src={step.imageUrl}
+                        alt={`Step ${i + 1}`}
+                        className="mt-2 max-h-48 rounded-lg object-cover"
+                      />
+                    )}
+                  </div>
+                </li>
+              ))}
+          </ol>
+        </div>
+      </div>
+
+      {/* Delete dialog */}
+      <ConfirmDialog
+        open={deleteOpen}
+        title="Delete recipe"
+        message={`Are you sure you want to delete "${recipe.title}"? This action cannot be undone.`}
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteOpen(false)}
+      />
+    </div>
+  );
+}
