@@ -1,11 +1,13 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { BookOpen, Plus, Search } from "lucide-react";
 import { useRecipes } from "@/hooks/useRecipes";
 import { useTags } from "@/hooks/useTags";
+import { useCategories } from "@/hooks/useCategories";
 import { buildSearchIndex } from "@/lib/search";
 import { RecipeCard } from "@/components/recipe/RecipeCard";
 import { TagChip } from "@/components/ui/TagChip";
+import { CategoryIcon } from "@/components/ui/CategoryIcon";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -13,7 +15,11 @@ import { EmptyState } from "@/components/ui/EmptyState";
 type SortOption = "newest" | "oldest" | "a-z" | "z-a" | "fastest" | "most-cooked";
 
 export function RecipeListPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string | undefined>(
+    () => searchParams.get("category") || undefined
+  );
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("newest");
 
@@ -21,8 +27,9 @@ export function RecipeListPage() {
     () => (selectedTags.length > 0 ? selectedTags : undefined),
     [selectedTags]
   );
-  const { recipes, loading } = useRecipes(tagFilter);
+  const { recipes, loading } = useRecipes(tagFilter, selectedCategory);
   const { tags } = useTags();
+  const { categories } = useCategories();
 
   const toggleTag = (tagId: string) => {
     setSelectedTags((prev) =>
@@ -33,8 +40,8 @@ export function RecipeListPage() {
   };
 
   const searchIndex = useMemo(
-    () => buildSearchIndex(recipes, tags),
-    [recipes, tags]
+    () => buildSearchIndex(recipes, tags, categories),
+    [recipes, tags, categories]
   );
 
   const filteredAndSorted = useMemo(() => {
@@ -74,11 +81,20 @@ export function RecipeListPage() {
     return sorted;
   }, [recipes, searchQuery, sortBy, searchIndex]);
 
+  const activeCategory = categories.find((c) => c.id === selectedCategory);
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-stone-800">Recipes</h1>
+        <div className="flex items-center gap-3">
+          {activeCategory && (
+            <CategoryIcon icon={activeCategory.icon} size={22} className="text-brand-600" />
+          )}
+          <h1 className="text-2xl font-bold text-stone-800">
+            {activeCategory ? activeCategory.name : "Recipes"}
+          </h1>
+        </div>
         <Link to="/recipes/new">
           <Button>
             <Plus size={18} />
@@ -86,6 +102,9 @@ export function RecipeListPage() {
           </Button>
         </Link>
       </div>
+      {activeCategory?.description && (
+        <p className="text-sm text-stone-500 -mt-3">{activeCategory.description}</p>
+      )}
 
       {/* Search + Sort */}
       <div className="flex flex-col sm:flex-row gap-3">
@@ -116,6 +135,34 @@ export function RecipeListPage() {
         </select>
       </div>
 
+      {/* Category filters */}
+      {categories.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {categories.map((cat) => (
+            <button
+              key={cat.id}
+              onClick={() => {
+                const next = selectedCategory === cat.id ? undefined : cat.id;
+                setSelectedCategory(next);
+                setSearchParams((prev) => {
+                  if (next) prev.set("category", next);
+                  else prev.delete("category");
+                  return prev;
+                });
+              }}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all border ${
+                selectedCategory === cat.id
+                  ? "border-brand-400 bg-brand-50 text-brand-700 ring-2 ring-brand-400/30"
+                  : "border-stone-200 bg-white text-stone-600 hover:border-stone-300 hover:bg-stone-50"
+              }`}
+            >
+              <CategoryIcon icon={cat.icon} size={14} />
+              {cat.name}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Tag filters */}
       {tags.length > 0 && (
         <div className="flex flex-wrap gap-2">
@@ -128,12 +175,19 @@ export function RecipeListPage() {
               onClick={() => toggleTag(tag.id)}
             />
           ))}
-          {selectedTags.length > 0 && (
+          {(selectedTags.length > 0 || selectedCategory) && (
             <button
-              onClick={() => setSelectedTags([])}
+              onClick={() => {
+                setSelectedTags([]);
+                setSelectedCategory(undefined);
+                setSearchParams((prev) => {
+                  prev.delete("category");
+                  return prev;
+                });
+              }}
               className="text-xs text-stone-500 hover:text-stone-700 underline"
             >
-              Clear filters
+              Clear all filters
             </button>
           )}
         </div>
@@ -147,7 +201,7 @@ export function RecipeListPage() {
       ) : filteredAndSorted.length > 0 ? (
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
           {filteredAndSorted.map((recipe) => (
-            <RecipeCard key={recipe.id} recipe={recipe} tags={tags} />
+            <RecipeCard key={recipe.id} recipe={recipe} tags={tags} categories={categories} />
           ))}
         </div>
       ) : recipes.length === 0 ? (

@@ -3,11 +3,13 @@ import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, GripVertical, ImagePlus, Link, Plus, Trash2, X } from "lucide-react";
 import { useRecipe, useRecipeMutations } from "@/hooks/useRecipes";
 import { useTags } from "@/hooks/useTags";
+import { useCategories } from "@/hooks/useCategories";
 import { useImageUpload } from "@/hooks/useImageUpload";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { TagChip } from "@/components/ui/TagChip";
+import { CategoryIcon } from "@/components/ui/CategoryIcon";
 import { Spinner } from "@/components/ui/Spinner";
 import type { Ingredient, Step, RecipeFormData } from "@/types/recipe";
 
@@ -28,6 +30,7 @@ const defaultForm: RecipeFormData = {
   sourceUrl: "",
   videoUrl: "",
   imageUrls: [],
+  categoryId: null,
   tags: [],
   ingredients: [emptyIngredient(0)],
   steps: [emptyStep(0)],
@@ -39,6 +42,7 @@ export function RecipeEditorPage() {
   const navigate = useNavigate();
   const { recipe, loading: loadingRecipe } = useRecipe(id);
   const { tags } = useTags();
+  const { categories } = useCategories();
   const { create, update } = useRecipeMutations();
   const { upload, uploading } = useImageUpload();
 
@@ -59,6 +63,7 @@ export function RecipeEditorPage() {
         sourceUrl: recipe.sourceUrl,
         videoUrl: recipe.videoUrl,
         imageUrls: recipe.imageUrls,
+        categoryId: recipe.categoryId,
         tags: recipe.tags,
         ingredients:
           recipe.ingredients.length > 0
@@ -373,6 +378,43 @@ export function RecipeEditorPage() {
               Add
             </Button>
           </div>
+        )}
+      </section>
+
+      {/* Category */}
+      <section className="space-y-4 rounded-xl border border-stone-200 bg-white p-6">
+        <h2 className="text-lg font-semibold text-stone-800">Category</h2>
+        {categories.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {categories.map((cat) => (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() =>
+                  setField(
+                    "categoryId",
+                    form.categoryId === cat.id ? null : cat.id
+                  )
+                }
+                className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-all border ${
+                  form.categoryId === cat.id
+                    ? "border-brand-400 bg-brand-50 text-brand-700 ring-2 ring-brand-400/30"
+                    : "border-stone-200 bg-white text-stone-600 hover:border-stone-300 hover:bg-stone-50"
+                }`}
+              >
+                <CategoryIcon icon={cat.icon} size={16} />
+                {cat.name}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-stone-500">
+            No categories yet.{" "}
+            <a href="/categories" className="text-brand-600 hover:underline">
+              Create some
+            </a>{" "}
+            first.
+          </p>
         )}
       </section>
 

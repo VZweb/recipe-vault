@@ -3,12 +3,14 @@ import { BookOpen, ChefHat, Package, Plus } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useRecipes } from "@/hooks/useRecipes";
 import { useTags } from "@/hooks/useTags";
+import { useCategories } from "@/hooks/useCategories";
 import { RecipeCard } from "@/components/recipe/RecipeCard";
 import { Spinner } from "@/components/ui/Spinner";
 
 export function HomePage() {
   const { recipes, loading } = useRecipes();
   const { tags } = useTags();
+  const { categories } = useCategories();
 
   const recentRecipes = recipes.slice(0, 4);
 
@@ -97,7 +99,7 @@ export function HomePage() {
         ) : recentRecipes.length > 0 ? (
           <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
             {recentRecipes.map((recipe) => (
-              <RecipeCard key={recipe.id} recipe={recipe} tags={tags} />
+              <RecipeCard key={recipe.id} recipe={recipe} tags={tags} categories={categories} />
             ))}
           </div>
         ) : (

@@ -22,6 +22,7 @@ export interface Recipe {
   sourceUrl: string;
   videoUrl: string;
   imageUrls: string[];
+  categoryId: string | null;
   tags: string[];
   ingredients: Ingredient[];
   steps: Step[];

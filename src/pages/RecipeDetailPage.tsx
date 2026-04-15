@@ -14,9 +14,11 @@ import {
 } from "lucide-react";
 import { useRecipe, useRecipeMutations } from "@/hooks/useRecipes";
 import { useTags } from "@/hooks/useTags";
+import { useCategories } from "@/hooks/useCategories";
 import { fetchPantryItems } from "@/lib/firestore";
 import { Button } from "@/components/ui/Button";
 import { TagChip } from "@/components/ui/TagChip";
+import { CategoryIcon } from "@/components/ui/CategoryIcon";
 import { Spinner } from "@/components/ui/Spinner";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import type { PantryItem } from "@/types/pantry";
@@ -26,6 +28,7 @@ export function RecipeDetailPage() {
   const navigate = useNavigate();
   const { recipe, loading, error } = useRecipe(id);
   const { tags } = useTags();
+  const { categories } = useCategories();
   const { remove, create, incrementCooked } = useRecipeMutations();
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [imageIdx, setImageIdx] = useState(0);
@@ -92,6 +95,7 @@ export function RecipeDetailPage() {
   }
 
   const recipeTags = tags.filter((t) => recipe.tags.includes(t.id));
+  const recipeCategory = categories.find((c) => c.id === recipe.categoryId);
   const totalTime =
     (recipe.prepTimeMin ?? 0) + (recipe.cookTimeMin ?? 0) || null;
 
@@ -110,6 +114,7 @@ export function RecipeDetailPage() {
       sourceUrl: recipe.sourceUrl,
       videoUrl: recipe.videoUrl,
       imageUrls: recipe.imageUrls,
+      categoryId: recipe.categoryId,
       tags: recipe.tags,
       ingredients: recipe.ingredients,
       steps: recipe.steps,
@@ -228,8 +233,17 @@ export function RecipeDetailPage() {
           </span>
         </div>
 
-        {recipeTags.length > 0 && (
-          <div className="mt-4 flex flex-wrap gap-2">
+        {(recipeCategory || recipeTags.length > 0) && (
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            {recipeCategory && (
+              <Link
+                to={`/recipes?category=${recipeCategory.id}`}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-700 hover:bg-brand-100 hover:border-brand-300 transition-colors"
+              >
+                <CategoryIcon icon={recipeCategory.icon} size={14} />
+                {recipeCategory.name}
+              </Link>
+            )}
             {recipeTags.map((tag) => (
               <TagChip key={tag.id} name={tag.name} color={tag.color} />
             ))}

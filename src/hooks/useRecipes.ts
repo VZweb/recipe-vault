@@ -9,7 +9,7 @@ import {
 } from "@/lib/firestore";
 import type { Recipe, RecipeFormData } from "@/types/recipe";
 
-export function useRecipes(tagFilter?: string[]) {
+export function useRecipes(tagFilter?: string[], categoryFilter?: string) {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -19,7 +19,8 @@ export function useRecipes(tagFilter?: string[]) {
     setError(null);
     try {
       const data = await fetchRecipes(
-        tagFilter && tagFilter.length > 0 ? tagFilter : undefined
+        tagFilter && tagFilter.length > 0 ? tagFilter : undefined,
+        categoryFilter
       );
       setRecipes(data);
     } catch (err) {
@@ -27,7 +28,7 @@ export function useRecipes(tagFilter?: string[]) {
     } finally {
       setLoading(false);
     }
-  }, [tagFilter]);
+  }, [tagFilter, categoryFilter]);
 
   useEffect(() => {
     void load();

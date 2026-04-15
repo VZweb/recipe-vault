@@ -1,19 +1,24 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ChefHat, Clock, Users } from "lucide-react";
 import type { Recipe } from "@/types/recipe";
 import type { Tag } from "@/types/tag";
+import type { Category } from "@/types/category";
 import { TagChip } from "@/components/ui/TagChip";
+import { CategoryIcon } from "@/components/ui/CategoryIcon";
 
 interface RecipeCardProps {
   recipe: Recipe;
   tags: Tag[];
+  categories?: Category[];
 }
 
-export function RecipeCard({ recipe, tags }: RecipeCardProps) {
+export function RecipeCard({ recipe, tags, categories = [] }: RecipeCardProps) {
+  const navigate = useNavigate();
   const totalTime =
     (recipe.prepTimeMin ?? 0) + (recipe.cookTimeMin ?? 0) || null;
 
   const recipeTags = tags.filter((t) => recipe.tags.includes(t.id));
+  const category = categories.find((c) => c.id === recipe.categoryId);
 
   return (
     <Link
@@ -58,9 +63,23 @@ export function RecipeCard({ recipe, tags }: RecipeCardProps) {
           </p>
         )}
 
-        {/* Tags */}
-        {recipeTags.length > 0 && (
+        {/* Category + Tags */}
+        {(category || recipeTags.length > 0) && (
           <div className="mt-3 flex flex-wrap gap-1.5">
+            {category && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  navigate(`/recipes?category=${category.id}`);
+                }}
+                className="inline-flex items-center gap-1 rounded-full border border-brand-200 bg-brand-50 px-2 py-0.5 text-[11px] font-medium text-brand-700 hover:bg-brand-100 hover:border-brand-300 transition-colors"
+              >
+                <CategoryIcon icon={category.icon} size={12} />
+                {category.name}
+              </button>
+            )}
             {recipeTags.slice(0, 3).map((tag) => (
               <TagChip key={tag.id} name={tag.name} color={tag.color} />
             ))}

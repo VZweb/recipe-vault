@@ -5,6 +5,7 @@ import { RecipeListPage } from "@/pages/RecipeListPage";
 import { RecipeDetailPage } from "@/pages/RecipeDetailPage";
 import { RecipeEditorPage } from "@/pages/RecipeEditorPage";
 import { TagsPage } from "@/pages/TagsPage";
+import { CategoriesPage } from "@/pages/CategoriesPage";
 import { PantryPage } from "@/pages/PantryPage";
 import { SuggestionsPage } from "@/pages/SuggestionsPage";
 
@@ -18,6 +19,7 @@ export function App() {
         <Route path="recipes/:id" element={<RecipeDetailPage />} />
         <Route path="recipes/:id/edit" element={<RecipeEditorPage />} />
         <Route path="tags" element={<TagsPage />} />
+        <Route path="categories" element={<CategoriesPage />} />
         <Route path="pantry" element={<PantryPage />} />
         <Route path="suggestions" element={<SuggestionsPage />} />
       </Route>

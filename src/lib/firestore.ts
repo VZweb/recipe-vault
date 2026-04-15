@@ -18,10 +18,12 @@ import { db } from "./firebase";
 import { deleteRecipeImage } from "./storage";
 import type { Recipe, RecipeFormData } from "@/types/recipe";
 import type { Tag } from "@/types/tag";
+import type { Category } from "@/types/category";
 import type { PantryItem } from "@/types/pantry";
 
 const recipesCol = collection(db, "recipes");
 const tagsCol = collection(db, "tags");
+const categoriesCol = collection(db, "categories");
 const pantryCol = collection(db, "pantry");
 
 function toDate(ts: Timestamp | Date | undefined): Date {
@@ -41,6 +43,7 @@ function docToRecipe(id: string, data: DocumentData): Recipe {
     sourceUrl: data.sourceUrl ?? "",
     videoUrl: data.videoUrl ?? "",
     imageUrls: data.imageUrls ?? [],
+    categoryId: data.categoryId ?? null,
     tags: data.tags ?? [],
     ingredients: (data.ingredients ?? []).map((ing: Record<string, unknown>) => ({
       ...ing,
@@ -61,6 +64,15 @@ function docToTag(id: string, data: DocumentData): Tag {
   };
 }
 
+function docToCategory(id: string, data: DocumentData): Category {
+  return {
+    id,
+    name: data.name ?? "",
+    description: data.description ?? "",
+    icon: data.icon ?? "utensils",
+  };
+}
+
 function docToPantryItem(id: string, data: DocumentData): PantryItem {
   return {
     id,
@@ -78,21 +90,28 @@ function docToPantryItem(id: string, data: DocumentData): PantryItem {
 
 // --- Recipes ---
 
-export async function fetchRecipes(tagIds?: string[]): Promise<Recipe[]> {
+export async function fetchRecipes(
+  tagIds?: string[],
+  categoryId?: string
+): Promise<Recipe[]> {
   let q;
 
   if (tagIds && tagIds.length > 0 && tagIds.length <= 10) {
     q = query(recipesCol, where("tags", "array-contains-any", tagIds));
+  } else if (categoryId) {
+    q = query(recipesCol, where("categoryId", "==", categoryId));
   } else {
     q = query(recipesCol, orderBy("createdAt", "desc"));
   }
 
   const snap = await getDocs(q);
-  const recipes = snap.docs.map((d) => docToRecipe(d.id, d.data()));
+  let recipes = snap.docs.map((d) => docToRecipe(d.id, d.data()));
 
-  if (tagIds && tagIds.length > 0) {
-    recipes.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  if (categoryId && tagIds && tagIds.length > 0) {
+    recipes = recipes.filter((r) => r.categoryId === categoryId);
   }
+
+  recipes.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
   return recipes;
 }
@@ -172,6 +191,47 @@ export async function deleteTag(id: string): Promise<void> {
     await batch.commit();
   } else {
     await deleteDoc(doc(db, "tags", id));
+  }
+}
+
+// --- Categories ---
+
+export async function fetchCategories(): Promise<Category[]> {
+  const q = query(categoriesCol, orderBy("name"));
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => docToCategory(d.id, d.data()));
+}
+
+export async function createCategory(
+  name: string,
+  icon: string,
+  description: string = ""
+): Promise<string> {
+  const docRef = await addDoc(categoriesCol, { name, icon, description });
+  return docRef.id;
+}
+
+export async function updateCategory(
+  id: string,
+  data: Partial<Omit<Category, "id">>
+): Promise<void> {
+  await updateDoc(doc(db, "categories", id), data);
+}
+
+export async function deleteCategory(id: string): Promise<void> {
+  const recipesWithCategory = await getDocs(
+    query(recipesCol, where("categoryId", "==", id))
+  );
+
+  if (!recipesWithCategory.empty) {
+    const batch = writeBatch(db);
+    for (const snap of recipesWithCategory.docs) {
+      batch.update(snap.ref, { categoryId: null });
+    }
+    batch.delete(doc(db, "categories", id));
+    await batch.commit();
+  } else {
+    await deleteDoc(doc(db, "categories", id));
   }
 }
 
