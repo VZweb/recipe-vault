@@ -10,6 +10,7 @@ dist/
 
 # Firebase
 .firebase/
+scripts/service-account.json
 
 # Editor
 .vscode/

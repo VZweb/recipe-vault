@@ -10,12 +10,12 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["icons/favicon.svg"],
-      selfDestroying: true,
+      includeAssets: ["icons/favicon.svg", "icons/apple-touch-icon.png"],
       manifest: {
         name: "Recipe Vault",
         short_name: "RecipeVault",
         description: "Your personal recipe manager",
+        start_url: "/",
         theme_color: "#16a34a",
         background_color: "#fafaf9",
         display: "standalone",
@@ -29,6 +29,12 @@ export default defineConfig({
             src: "icons/icon-512.png",
             sizes: "512x512",
             type: "image/png",
+          },
+          {
+            src: "icons/icon-512-maskable.png",
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "maskable",
           },
         ],
       },
