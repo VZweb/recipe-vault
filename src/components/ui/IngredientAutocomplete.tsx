@@ -7,6 +7,7 @@ interface Props {
   value: string;
   placeholder?: string;
   className?: string;
+  wrapperClassName?: string;
   onSelect: (ingredient: MasterIngredient) => void;
   onChange: (value: string) => void;
 }
@@ -16,6 +17,7 @@ export function IngredientAutocomplete({
   value,
   placeholder,
   className = "",
+  wrapperClassName = "",
   onSelect,
   onChange,
 }: Props) {
@@ -34,10 +36,8 @@ export function IngredientAutocomplete({
             normalizeText(ing.name),
             normalizeText(ing.nameGr),
             ...ing.aliases.map(normalizeText),
-          ];
-          return targets.some(
-            (t) => t.includes(query) || query.includes(t)
-          );
+          ].filter(Boolean);
+          return targets.some((t) => t.includes(query));
         });
 
   useEffect(() => {
@@ -83,7 +83,7 @@ export function IngredientAutocomplete({
   };
 
   return (
-    <div ref={wrapperRef} className="relative">
+    <div ref={wrapperRef} className={`relative ${wrapperClassName}`}>
       <input
         type="text"
         value={value}

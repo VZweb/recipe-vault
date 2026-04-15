@@ -8,6 +8,7 @@ import {
   Copy,
   Edit,
   ExternalLink,
+  Link2,
   Play,
   Trash2,
   Users,
@@ -332,6 +333,11 @@ export function RecipeDetailPage() {
                       {ing.nameSecondary && (
                         <span className="ml-1.5 italic text-stone-400">
                           ({ing.nameSecondary})
+                        </span>
+                      )}
+                      {ing.masterIngredientId && (
+                        <span className="ml-1 inline-flex text-brand-400" title="From catalog">
+                          <Link2 size={12} />
                         </span>
                       )}
                     </span>

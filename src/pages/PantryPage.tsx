@@ -7,6 +7,7 @@ import {
   ChevronsUpDown,
   ImagePlus,
   Link,
+  Link2,
   Package,
   Pencil,
   Plus,
@@ -35,6 +36,7 @@ interface EditState {
   quantity: string;
   unit: string;
   masterIngredientId: string | null;
+  note: string;
   imageFile: File | null;
   imagePreview: string | null;
   removeImage: boolean;
@@ -58,6 +60,7 @@ export function PantryPage() {
   const [newMasterIngredientId, setNewMasterIngredientId] = useState<
     string | null
   >(null);
+  const [newNote, setNewNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const { ingredients: masterIngredients } = useIngredients();
 
@@ -123,6 +126,7 @@ export function PantryPage() {
         isStaple: newIsStaple,
         imageUrl: null,
         masterIngredientId: newMasterIngredientId,
+        note: newNote.trim(),
       });
 
       let imageUrl: string | null = null;
@@ -147,6 +151,7 @@ export function PantryPage() {
           isStaple: newIsStaple,
           imageUrl,
           masterIngredientId: newMasterIngredientId,
+          note: newNote.trim(),
           addedAt: new Date(),
         },
       ]);
@@ -157,6 +162,7 @@ export function PantryPage() {
       setNewUnit("");
       setNewIsStaple(false);
       setNewMasterIngredientId(null);
+      setNewNote("");
       clearImageSelection();
     } finally {
       setSubmitting(false);
@@ -185,6 +191,7 @@ export function PantryPage() {
       quantity: item.quantity?.toString() ?? "",
       unit: item.unit ?? "",
       masterIngredientId: item.masterIngredientId,
+      note: item.note ?? "",
       imageFile: null,
       imagePreview: null,
       removeImage: false,
@@ -247,6 +254,10 @@ export function PantryPage() {
       if (editState.masterIngredientId !== item.masterIngredientId) {
         updates.masterIngredientId = editState.masterIngredientId;
       }
+      const trimmedNote = editState.note.trim();
+      if (trimmedNote !== (item.note ?? "")) {
+        updates.note = trimmedNote;
+      }
 
       let newImageUrl = item.imageUrl;
 
@@ -280,6 +291,7 @@ export function PantryPage() {
                 unit,
                 imageUrl: newImageUrl,
                 masterIngredientId: editState.masterIngredientId,
+                note: trimmedNote,
               }
             : i
         )
@@ -505,6 +517,15 @@ export function PantryPage() {
           </div>
         </div>
 
+        {/* Note */}
+        <input
+          type="text"
+          placeholder="Note (brand, source, etc.)"
+          value={newNote}
+          onChange={(e) => setNewNote(e.target.value)}
+          className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-700 placeholder:text-stone-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-colors"
+        />
+
         {/* Image URL input */}
         {showNewImageUrlInput && (
           <div className="flex gap-2">
@@ -591,7 +612,8 @@ export function PantryPage() {
                               ingredients={masterIngredients}
                               value={editState.name}
                               placeholder="Item name"
-                              className="flex-1 rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                              wrapperClassName="flex-1"
+                              className="w-full rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                               onChange={(v) =>
                                 setEditState((s) =>
                                   s
@@ -663,6 +685,19 @@ export function PantryPage() {
                               ))}
                             </select>
                           </div>
+
+                          {/* Edit: Note */}
+                          <input
+                            type="text"
+                            placeholder="Note (brand, source, etc.)"
+                            value={editState.note}
+                            onChange={(e) =>
+                              setEditState((s) =>
+                                s ? { ...s, note: e.target.value } : s
+                              )
+                            }
+                            className="w-full rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-700 placeholder:text-stone-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                          />
 
                           {/* Edit: Photo */}
                           <div className="space-y-2">
@@ -845,6 +880,11 @@ export function PantryPage() {
                                     ({item.nameSecondary})
                                   </span>
                                 )}
+                                {item.masterIngredientId && (
+                                  <span className="text-brand-400" title="Linked to catalog">
+                                    <Link2 size={12} />
+                                  </span>
+                                )}
                                 {item.isStaple && (
                                   <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">
                                     Staple
@@ -855,6 +895,11 @@ export function PantryPage() {
                                 <span className="text-xs text-stone-400 mt-0.5 block">
                                   {item.quantity}
                                   {item.unit ? ` ${item.unit}` : ""}
+                                </span>
+                              )}
+                              {item.note && (
+                                <span className="text-xs italic text-stone-400 mt-0.5 block">
+                                  {item.note}
                                 </span>
                               )}
                             </div>

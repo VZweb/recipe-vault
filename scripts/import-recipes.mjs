@@ -163,33 +163,40 @@ for (let i = 0; i < recipes.length; i++) {
       prepTimeMin: r.prepTimeMin ?? null,
       cookTimeMin: r.cookTimeMin ?? null,
       sourceUrl: r.sourceUrl || "",
+      videoUrl: r.videoUrl || "",
       imageUrls: r.imageUrls || [],
       tags: tagIds,
       ingredients: (r.ingredients || []).map((ing, idx) => ({
         name: ing.name || "",
+        nameSecondary: ing.nameSecondary || "",
         quantity: ing.quantity ?? null,
         unit: ing.unit || "",
         sortOrder: ing.sortOrder ?? idx,
+        masterIngredientId: ing.masterIngredientId ?? null,
       })),
       steps: (r.steps || []).map((s, idx) => ({
         instruction: typeof s === "string" ? s : s.instruction || "",
         imageUrl: s.imageUrl ?? null,
         sortOrder: s.sortOrder ?? idx,
       })),
+      cookedCount: 0,
       createdAt: now,
       updatedAt: now,
     };
 
+    const linked = doc.ingredients.filter((i) => i.masterIngredientId).length;
+    const ingStats = `${doc.ingredients.length} ingredients (${linked} linked)`;
+
     if (dryRun) {
       console.log(
         `${label} Would import: "${r.title}" ` +
-          `(${doc.ingredients.length} ingredients, ${doc.steps.length} steps)`
+          `(${ingStats}, ${doc.steps.length} steps)`
       );
     } else {
       const ref = await recipesCol.add(doc);
       console.log(
         `${label} Imported: "${r.title}" → ${ref.id} ` +
-          `(${doc.ingredients.length} ingredients, ${doc.steps.length} steps)`
+          `(${ingStats}, ${doc.steps.length} steps)`
       );
     }
     imported++;

@@ -140,7 +140,7 @@ function extractNoteFromHtml(htmlContent) {
 // ---------------------------------------------------------------------------
 
 const QUANTITY_RE =
-  /^(\d[\d./\s½¼¾⅓⅔⅛-]*)\s*(cups?|tbsp|tsp|tablespoons?|teaspoons?|oz|ounces?|lbs?|pounds?|g|grams?|kg|ml|liters?|litres?|pieces?|cloves?|pinch|bunch|handful|can|cans|packets?|slices?|sticks?|large|medium|small|whole)?\s+/i;
+  /^(\d[\d./\s½¼¾⅓⅔⅛-]*)\s*(cups?|tbsp|tsp|tablespoons?|teaspoons?|oz|ounces?|lbs?|pounds?|g|grams?|kg|ml|liters?|litres?|pieces?|cloves?|pinch|bunch|handful|can|cans|packets?|slices?|sticks?|large|medium|small|whole|γρ\.?|κ\.σ\.?|κ\.γ\.?|φλ\.?|τεμ\.?|λ\.?|κιλ[οό]\.?|μερίδες|ματσάκι[α]?|κλωνάρι[α]?|φέτ[αε]ς?|κομμάτι[α]?|κουτ[ιί]\.?|πακέτ[οα]\.?|μπουκάλι[α]?|δόσεις?|σακουλ[αά]κι[α]?)?\s+/i;
 
 const SECTION_HEADERS_INGREDIENTS = [
   "ingredients",
@@ -169,7 +169,71 @@ function isSectionHeader(line, headers) {
 function looksLikeIngredient(line) {
   if (QUANTITY_RE.test(line)) return true;
   if (/^[-•*]\s/.test(line) && line.length < 80) return true;
+  if (/^[-•*]?\s*\d/.test(line) && line.length < 80) return true;
   return false;
+}
+
+// Greek unit abbreviation → normalized display form
+const GREEK_UNIT_MAP = {
+  "γρ": "g", "γρ.": "g",
+  "κ.σ": "tbsp", "κ.σ.": "tbsp",
+  "κ.γ": "tsp", "κ.γ.": "tsp",
+  "φλ": "cups", "φλ.": "cups",
+  "τεμ": "pcs", "τεμ.": "pcs",
+  "λ": "L", "λ.": "L",
+  "κιλο": "kg", "κιλό": "kg", "κιλο.": "kg", "κιλό.": "kg",
+  "ματσάκι": "bunch", "ματσάκια": "bunch",
+  "κλωνάρι": "pcs", "κλωνάρια": "pcs",
+  "φέτα": "slices", "φέτες": "slices",
+  "κομμάτι": "pcs", "κομμάτια": "pcs",
+  "κουτί": "can", "κουτι": "can", "κουτί.": "can", "κουτι.": "can",
+  "πακέτο": "pack", "πακέτα": "pack", "πακετο": "pack", "πακετο.": "pack",
+  "μπουκάλι": "bottle", "μπουκάλια": "bottle",
+  "δόση": "pcs", "δόσεις": "pcs",
+  "σακουλάκι": "bag", "σακουλάκια": "bag", "σακουλακι": "bag", "σακουλακια": "bag",
+  "μερίδες": "pcs",
+};
+
+function normalizeUnit(raw) {
+  const lower = raw.toLowerCase();
+  return GREEK_UNIT_MAP[lower] || raw;
+}
+
+function cleanIngredientName(name) {
+  return name
+    // Strip cost annotations: ($5.25), ($0.10)
+    .replace(/\(\$[\d.]+\)/g, "")
+    // Strip parenthetical weight/volume duplicates: (30ml), (50g), (about 1.3 lb. total)
+    .replace(/\((?:about\s+)?[\d.]+\s*(?:ml|g|kg|oz|lb|lbs|liters?|litres?)\.?(?:\s+total)?\)/gi, "")
+    // Strip κτψ / κατεψυγμένο/η/ο (frozen abbreviation and full form)
+    .replace(/(?:^|\s)κτψ\.?(?:\s|$)/gi, " ")
+    .replace(/(?:^|\s)κατεψυγμέν[οηα](?:\s|$)/gi, " ")
+    // Collapse whitespace
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function parseQuantity(qtyStr) {
+  try {
+    const result = qtyStr
+      .replace("½", ".5")
+      .replace("¼", ".25")
+      .replace("¾", ".75")
+      .replace("⅓", ".333")
+      .replace("⅔", ".667")
+      .replace("⅛", ".125")
+      .split(/\s+/)
+      .reduce((sum, part) => {
+        if (part.includes("/")) {
+          const [n, d] = part.split("/");
+          return sum + Number(n) / Number(d);
+        }
+        return sum + Number(part);
+      }, 0);
+    return isNaN(result) ? null : result;
+  } catch {
+    return null;
+  }
 }
 
 function parseIngredientLine(raw) {
@@ -177,32 +241,19 @@ function parseIngredientLine(raw) {
   const match = clean.match(QUANTITY_RE);
   if (match) {
     const qtyStr = match[1].trim();
-    const unit = (match[2] || "").trim();
-    const name = clean.slice(match[0].length).trim();
-    let quantity = null;
-    try {
-      quantity = qtyStr
-        .replace("½", ".5")
-        .replace("¼", ".25")
-        .replace("¾", ".75")
-        .replace("⅓", ".333")
-        .replace("⅔", ".667")
-        .replace("⅛", ".125")
-        .split(/\s+/)
-        .reduce((sum, part) => {
-          if (part.includes("/")) {
-            const [n, d] = part.split("/");
-            return sum + Number(n) / Number(d);
-          }
-          return sum + Number(part);
-        }, 0);
-      if (isNaN(quantity)) quantity = null;
-    } catch {
-      quantity = null;
-    }
+    const rawUnit = (match[2] || "").trim();
+    const unit = normalizeUnit(rawUnit);
+    const name = cleanIngredientName(clean.slice(match[0].length));
+    const quantity = parseQuantity(qtyStr);
     return { name: name || clean, quantity, unit };
   }
-  return { name: clean, quantity: null, unit: "" };
+  return { name: cleanIngredientName(clean), quantity: null, unit: "" };
+}
+
+const VIDEO_URL_RE = /(?:youtube\.com|youtu\.be|vimeo\.com|tiktok\.com)/i;
+
+function isVideoUrl(url) {
+  return VIDEO_URL_RE.test(url);
 }
 
 function parseRecipeContent(title, lines, annotations) {
@@ -211,11 +262,18 @@ function parseRecipeContent(title, lines, annotations) {
   let description = "";
   let servings = null;
   let sourceUrl = "";
+  let videoUrl = "";
 
   // Pull URL and description from web-link annotations first
   if (annotations.length > 0) {
     const ann = annotations[0];
-    if (ann.url) sourceUrl = ann.url;
+    if (ann.url) {
+      if (isVideoUrl(ann.url)) {
+        videoUrl = ann.url;
+      } else {
+        sourceUrl = ann.url;
+      }
+    }
     if (ann.description) description = ann.description;
   }
 
@@ -224,8 +282,13 @@ function parseRecipeContent(title, lines, annotations) {
   for (const line of lines) {
     // Detect URLs
     const urlMatch = line.match(/https?:\/\/\S+/);
-    if (urlMatch && !sourceUrl) {
-      sourceUrl = urlMatch[0];
+    if (urlMatch) {
+      const url = urlMatch[0];
+      if (isVideoUrl(url) && !videoUrl) {
+        videoUrl = url;
+      } else if (!isVideoUrl(url) && !sourceUrl) {
+        sourceUrl = url;
+      }
     }
     // Skip lines that are purely a URL (already captured above)
     if (urlMatch && line.trim() === urlMatch[0]) continue;
@@ -296,6 +359,7 @@ function parseRecipeContent(title, lines, annotations) {
     prepTimeMin: null,
     cookTimeMin: null,
     sourceUrl,
+    videoUrl,
     imageUrls: [],
     tags: [],
     ingredients,
@@ -417,6 +481,8 @@ Next steps:
      - Add descriptions, servings, prep/cook times
      - Adjust tags (these are Keep label names; the import script
        will create or match tags in Firestore automatically)
-  2. Run the import:
+  2. (Optional) Enrich with ingredient catalog matching:
+     node enrich-recipes.mjs ${outputPath}
+  3. Run the import:
      node import-recipes.mjs ${outputPath}
 `);

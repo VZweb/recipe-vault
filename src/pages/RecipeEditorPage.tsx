@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, GripVertical, ImagePlus, Link, Plus, Trash2, X } from "lucide-react";
+import { ArrowLeft, GripVertical, ImagePlus, Link, Link2, Plus, Trash2, X } from "lucide-react";
 import { useRecipe, useRecipeMutations } from "@/hooks/useRecipes";
 import { useTags } from "@/hooks/useTags";
 import { useCategories } from "@/hooks/useCategories";
@@ -478,7 +478,12 @@ export function RecipeEditorPage() {
                 ingredients={masterIngredients}
                 value={ing.name}
                 placeholder="Ingredient name"
-                className="flex-1 rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                wrapperClassName="flex-1"
+                className={`w-full rounded-lg border bg-white px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 ${
+                  ing.masterIngredientId
+                    ? "border-brand-300 bg-brand-50/30"
+                    : "border-stone-300"
+                }`}
                 onChange={(v) => updateIngredient(idx, { name: v, masterIngredientId: null })}
                 onSelect={(mi) =>
                   updateIngredient(idx, {
@@ -488,6 +493,17 @@ export function RecipeEditorPage() {
                   })
                 }
               />
+              {ing.masterIngredientId ? (
+                <span title="Linked to catalog" className="flex-shrink-0 text-brand-500">
+                  <Link2 size={14} />
+                </span>
+              ) : (
+                ing.name.trim() && (
+                  <span title="Not in catalog" className="flex-shrink-0 text-stone-300">
+                    <Link2 size={14} />
+                  </span>
+                )
+              )}
               <input
                 type="text"
                 placeholder="Greek name"

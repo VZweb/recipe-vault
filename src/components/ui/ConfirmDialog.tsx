@@ -33,7 +33,7 @@ export function ConfirmDialog({
     <dialog
       ref={dialogRef}
       onClose={onCancel}
-      className="rounded-xl bg-white p-0 shadow-xl backdrop:bg-black/40 max-w-sm w-full"
+      className="m-auto rounded-xl bg-white p-0 shadow-xl backdrop:bg-black/40 max-w-sm w-full"
     >
       <div className="p-6">
         <h3 className="text-lg font-semibold text-stone-900">{title}</h3>
