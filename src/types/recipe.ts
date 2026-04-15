@@ -25,8 +25,9 @@ export interface Recipe {
   tags: string[];
   ingredients: Ingredient[];
   steps: Step[];
+  cookedCount: number;
   createdAt: Date;
   updatedAt: Date;
 }
 
-export type RecipeFormData = Omit<Recipe, "id" | "createdAt" | "updatedAt">;
+export type RecipeFormData = Omit<Recipe, "id" | "createdAt" | "updatedAt" | "cookedCount">;

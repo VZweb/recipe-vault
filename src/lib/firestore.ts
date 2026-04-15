@@ -10,6 +10,7 @@ import {
   query,
   orderBy,
   where,
+  increment,
   Timestamp,
   type DocumentData,
 } from "firebase/firestore";
@@ -46,6 +47,7 @@ function docToRecipe(id: string, data: DocumentData): Recipe {
       nameSecondary: ing.nameSecondary ?? "",
     })),
     steps: data.steps ?? [],
+    cookedCount: data.cookedCount ?? 0,
     createdAt: toDate(data.createdAt),
     updatedAt: toDate(data.updatedAt),
   };
@@ -128,6 +130,13 @@ export async function deleteRecipe(id: string): Promise<void> {
   if (recipe?.imageUrls.length) {
     await Promise.allSettled(recipe.imageUrls.map(deleteRecipeImage));
   }
+}
+
+export async function incrementCookedCount(id: string): Promise<void> {
+  await updateDoc(doc(db, "recipes", id), {
+    cookedCount: increment(1),
+    updatedAt: Timestamp.now(),
+  });
 }
 
 // --- Tags ---

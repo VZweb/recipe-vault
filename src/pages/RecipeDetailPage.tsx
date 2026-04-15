@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import {
   ArrowLeft,
   Check,
+  ChefHat,
   Clock,
   Copy,
   Edit,
@@ -25,9 +26,10 @@ export function RecipeDetailPage() {
   const navigate = useNavigate();
   const { recipe, loading, error } = useRecipe(id);
   const { tags } = useTags();
-  const { remove, create } = useRecipeMutations();
+  const { remove, create, incrementCooked } = useRecipeMutations();
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [imageIdx, setImageIdx] = useState(0);
+  const [cookedCount, setCookedCount] = useState(0);
   const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
 
   const loadPantry = useCallback(async () => {
@@ -38,6 +40,16 @@ export function RecipeDetailPage() {
   useEffect(() => {
     void loadPantry();
   }, [loadPantry]);
+
+  useEffect(() => {
+    if (recipe) setCookedCount(recipe.cookedCount);
+  }, [recipe]);
+
+  const handleMarkCooked = async () => {
+    if (!recipe) return;
+    setCookedCount((c) => c + 1);
+    await incrementCooked(recipe.id);
+  };
 
   const pantryNames = useMemo(() => {
     const normalize = (s: string) => s.toLowerCase().trim().replace(/\s+/g, " ");
@@ -117,6 +129,13 @@ export function RecipeDetailPage() {
           Back to recipes
         </Link>
         <div className="flex items-center gap-2">
+          <Button variant="secondary" size="sm" onClick={handleMarkCooked}>
+            <ChefHat size={16} />
+            <span className="hidden sm:inline">I made this!</span>
+            <span className="inline-flex items-center justify-center rounded-full bg-brand-100 text-brand-700 text-xs font-semibold min-w-[1.25rem] h-5 px-1">
+              {cookedCount}
+            </span>
+          </Button>
           <Button variant="ghost" size="sm" onClick={handleDuplicate}>
             <Copy size={16} />
             <span className="hidden sm:inline">Duplicate</span>
@@ -203,6 +222,10 @@ export function RecipeDetailPage() {
               {recipe.servings} servings
             </span>
           )}
+          <span className="flex items-center gap-1.5 font-medium text-brand-600">
+            <ChefHat size={16} />
+            Cooked {cookedCount} {cookedCount === 1 ? "time" : "times"}
+          </span>
         </div>
 
         {recipeTags.length > 0 && (

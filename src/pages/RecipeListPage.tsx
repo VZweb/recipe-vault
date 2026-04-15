@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import { EmptyState } from "@/components/ui/EmptyState";
 
-type SortOption = "newest" | "oldest" | "a-z" | "z-a" | "fastest";
+type SortOption = "newest" | "oldest" | "a-z" | "z-a" | "fastest" | "most-cooked";
 
 export function RecipeListPage() {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -66,6 +66,9 @@ export function RecipeListPage() {
         sorted.sort((a, b) => totalTime(a) - totalTime(b));
         break;
       }
+      case "most-cooked":
+        sorted.sort((a, b) => b.cookedCount - a.cookedCount);
+        break;
     }
 
     return sorted;
@@ -109,6 +112,7 @@ export function RecipeListPage() {
           <option value="a-z">A → Z</option>
           <option value="z-a">Z → A</option>
           <option value="fastest">Fastest first</option>
+          <option value="most-cooked">Most cooked</option>
         </select>
       </div>
 

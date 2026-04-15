@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Clock, Users } from "lucide-react";
+import { ChefHat, Clock, Users } from "lucide-react";
 import type { Recipe } from "@/types/recipe";
 import type { Tag } from "@/types/tag";
 import { TagChip } from "@/components/ui/TagChip";
@@ -84,6 +84,12 @@ export function RecipeCard({ recipe, tags }: RecipeCardProps) {
             <span className="flex items-center gap-1">
               <Users size={14} />
               {recipe.servings}
+            </span>
+          )}
+          {recipe.cookedCount > 0 && (
+            <span className="flex items-center gap-1 text-brand-600 font-medium">
+              <ChefHat size={14} />
+              {recipe.cookedCount}
             </span>
           )}
         </div>
