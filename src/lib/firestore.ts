@@ -20,11 +20,13 @@ import type { Recipe, RecipeFormData } from "@/types/recipe";
 import type { Tag } from "@/types/tag";
 import type { Category } from "@/types/category";
 import type { PantryItem } from "@/types/pantry";
+import type { MasterIngredient } from "@/types/ingredient";
 
 const recipesCol = collection(db, "recipes");
 const tagsCol = collection(db, "tags");
 const categoriesCol = collection(db, "categories");
 const pantryCol = collection(db, "pantry");
+const ingredientsCol = collection(db, "ingredients");
 
 function toDate(ts: Timestamp | Date | undefined): Date {
   if (ts instanceof Timestamp) return ts.toDate();
@@ -48,6 +50,7 @@ function docToRecipe(id: string, data: DocumentData): Recipe {
     ingredients: (data.ingredients ?? []).map((ing: Record<string, unknown>) => ({
       ...ing,
       nameSecondary: ing.nameSecondary ?? "",
+      masterIngredientId: ing.masterIngredientId ?? null,
     })),
     steps: data.steps ?? [],
     cookedCount: data.cookedCount ?? 0,
@@ -84,7 +87,21 @@ function docToPantryItem(id: string, data: DocumentData): PantryItem {
     unit: data.unit ?? null,
     isStaple: data.isStaple ?? false,
     imageUrl: data.imageUrl ?? null,
+    masterIngredientId: data.masterIngredientId ?? null,
     addedAt: toDate(data.addedAt),
+  };
+}
+
+function docToMasterIngredient(
+  id: string,
+  data: DocumentData
+): MasterIngredient {
+  return {
+    id,
+    name: data.name ?? "",
+    nameGr: data.nameGr ?? "",
+    aliases: data.aliases ?? [],
+    category: data.category ?? "Other",
   };
 }
 
@@ -272,4 +289,30 @@ export async function deletePantryItem(id: string): Promise<void> {
     const { deletePantryImage } = await import("./storage");
     await deletePantryImage(imageUrl);
   }
+}
+
+// --- Master Ingredients ---
+
+export async function fetchMasterIngredients(): Promise<MasterIngredient[]> {
+  const q = query(ingredientsCol, orderBy("name"));
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => docToMasterIngredient(d.id, d.data()));
+}
+
+export async function addMasterIngredient(
+  item: Omit<MasterIngredient, "id">
+): Promise<string> {
+  const docRef = await addDoc(ingredientsCol, item);
+  return docRef.id;
+}
+
+export async function updateMasterIngredient(
+  id: string,
+  data: Partial<Omit<MasterIngredient, "id">>
+): Promise<void> {
+  await updateDoc(doc(db, "ingredients", id), data);
+}
+
+export async function deleteMasterIngredient(id: string): Promise<void> {
+  await deleteDoc(doc(db, "ingredients", id));
 }

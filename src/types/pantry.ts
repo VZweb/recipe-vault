@@ -8,6 +8,7 @@ export interface PantryItem {
   unit: string | null;
   isStaple: boolean;
   imageUrl: string | null;
+  masterIngredientId: string | null;
   addedAt: Date;
 }
 

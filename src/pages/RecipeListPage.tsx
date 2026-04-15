@@ -4,6 +4,7 @@ import { BookOpen, Plus, Search } from "lucide-react";
 import { useRecipes } from "@/hooks/useRecipes";
 import { useTags } from "@/hooks/useTags";
 import { useCategories } from "@/hooks/useCategories";
+import { useIngredients } from "@/hooks/useIngredients";
 import { buildSearchIndex } from "@/lib/search";
 import { RecipeCard } from "@/components/recipe/RecipeCard";
 import { TagChip } from "@/components/ui/TagChip";
@@ -30,6 +31,7 @@ export function RecipeListPage() {
   const { recipes, loading } = useRecipes(tagFilter, selectedCategory);
   const { tags } = useTags();
   const { categories } = useCategories();
+  const { ingredients: masterIngredients } = useIngredients();
 
   const toggleTag = (tagId: string) => {
     setSelectedTags((prev) =>
@@ -40,8 +42,8 @@ export function RecipeListPage() {
   };
 
   const searchIndex = useMemo(
-    () => buildSearchIndex(recipes, tags, categories),
-    [recipes, tags, categories]
+    () => buildSearchIndex(recipes, tags, categories, masterIngredients),
+    [recipes, tags, categories, masterIngredients]
   );
 
   const filteredAndSorted = useMemo(() => {

@@ -4,6 +4,7 @@ export interface Ingredient {
   quantity: number | null;
   unit: string;
   sortOrder: number;
+  masterIngredientId: string | null;
 }
 
 export interface Step {

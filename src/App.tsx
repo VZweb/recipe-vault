@@ -7,6 +7,7 @@ import { RecipeEditorPage } from "@/pages/RecipeEditorPage";
 import { TagsPage } from "@/pages/TagsPage";
 import { CategoriesPage } from "@/pages/CategoriesPage";
 import { PantryPage } from "@/pages/PantryPage";
+import { IngredientsPage } from "@/pages/IngredientsPage";
 import { SuggestionsPage } from "@/pages/SuggestionsPage";
 
 export function App() {
@@ -21,6 +22,7 @@ export function App() {
         <Route path="tags" element={<TagsPage />} />
         <Route path="categories" element={<CategoriesPage />} />
         <Route path="pantry" element={<PantryPage />} />
+        <Route path="ingredients" element={<IngredientsPage />} />
         <Route path="suggestions" element={<SuggestionsPage />} />
       </Route>
     </Routes>

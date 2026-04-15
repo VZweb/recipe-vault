@@ -1,0 +1,520 @@
+import { useState } from "react";
+import {
+  ChevronDown,
+  ChevronRight,
+  ChevronsDownUp,
+  ChevronsUpDown,
+  Egg,
+  Pencil,
+  Plus,
+  Trash2,
+  X,
+} from "lucide-react";
+import { useIngredients } from "@/hooks/useIngredients";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Spinner } from "@/components/ui/Spinner";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import type { MasterIngredient, IngredientCategory } from "@/types/ingredient";
+import { INGREDIENT_CATEGORIES } from "@/types/ingredient";
+
+interface EditState {
+  name: string;
+  nameGr: string;
+  aliases: string[];
+  aliasInput: string;
+  category: IngredientCategory;
+}
+
+export function IngredientsPage() {
+  const { ingredients, loading, add, update, remove } = useIngredients();
+  const [newName, setNewName] = useState("");
+  const [newNameGr, setNewNameGr] = useState("");
+  const [newCategory, setNewCategory] =
+    useState<IngredientCategory>("Other");
+  const [newAliases, setNewAliases] = useState<string[]>([]);
+  const [newAliasInput, setNewAliasInput] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editState, setEditState] = useState<EditState | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(
+    new Set()
+  );
+
+  const handleAddAlias = () => {
+    const alias = newAliasInput.trim();
+    if (!alias || newAliases.includes(alias)) return;
+    setNewAliases((prev) => [...prev, alias]);
+    setNewAliasInput("");
+  };
+
+  const handleAdd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newName.trim()) return;
+
+    setSubmitting(true);
+    try {
+      await add({
+        name: newName.trim(),
+        nameGr: newNameGr.trim(),
+        aliases: newAliases,
+        category: newCategory,
+      });
+      setNewName("");
+      setNewNameGr("");
+      setNewAliases([]);
+      setNewAliasInput("");
+      setNewCategory("Other");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const startEditing = (item: MasterIngredient) => {
+    setEditingId(item.id);
+    setEditState({
+      name: item.name,
+      nameGr: item.nameGr,
+      aliases: [...item.aliases],
+      aliasInput: "",
+      category: item.category,
+    });
+  };
+
+  const cancelEditing = () => {
+    setEditingId(null);
+    setEditState(null);
+  };
+
+  const handleEditAddAlias = () => {
+    if (!editState) return;
+    const alias = editState.aliasInput.trim();
+    if (!alias || editState.aliases.includes(alias)) return;
+    setEditState((s) =>
+      s ? { ...s, aliases: [...s.aliases, alias], aliasInput: "" } : s
+    );
+  };
+
+  const saveEdit = async (item: MasterIngredient) => {
+    if (!editState || !editState.name.trim()) return;
+    setSaving(true);
+    try {
+      await update(item.id, {
+        name: editState.name.trim(),
+        nameGr: editState.nameGr.trim(),
+        aliases: editState.aliases,
+        category: editState.category,
+      });
+      cancelEditing();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    await remove(deleteId);
+    setDeleteId(null);
+  };
+
+  const toggleCategory = (cat: string) => {
+    setCollapsedCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(cat)) next.delete(cat);
+      else next.add(cat);
+      return next;
+    });
+  };
+
+  const grouped = INGREDIENT_CATEGORIES.reduce(
+    (acc, cat) => {
+      const catItems = ingredients.filter((i) => i.category === cat);
+      if (catItems.length > 0) acc[cat] = catItems;
+      return acc;
+    },
+    {} as Record<string, MasterIngredient[]>
+  );
+
+  const categoryKeys = Object.keys(grouped);
+  const allCollapsed =
+    categoryKeys.length > 0 &&
+    categoryKeys.every((k) => collapsedCategories.has(k));
+
+  const collapseAll = () =>
+    setCollapsedCategories(new Set(categoryKeys));
+  const expandAll = () => setCollapsedCategories(new Set());
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-24">
+        <Spinner className="h-8 w-8" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-stone-800">
+          Ingredient Catalog
+        </h1>
+        <p className="mt-1 text-sm text-stone-500">
+          Master list of ingredients. Recipes and pantry items link here for
+          consistent matching.
+        </p>
+      </div>
+
+      {/* Add form */}
+      <form
+        onSubmit={handleAdd}
+        className="space-y-3 rounded-xl border border-stone-200 bg-white p-4"
+      >
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex-1">
+            <Input
+              placeholder="Name (English)"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+            />
+          </div>
+          <div className="flex-1">
+            <Input
+              placeholder="Name (Greek)"
+              value={newNameGr}
+              onChange={(e) => setNewNameGr(e.target.value)}
+            />
+          </div>
+          <select
+            value={newCategory}
+            onChange={(e) =>
+              setNewCategory(e.target.value as IngredientCategory)
+            }
+            className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-700 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+          >
+            {INGREDIENT_CATEGORIES.map((cat) => (
+              <option key={cat} value={cat}>
+                {cat}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Aliases */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-stone-500">Aliases:</span>
+          {newAliases.map((alias, i) => (
+            <span
+              key={i}
+              className="inline-flex items-center gap-1 rounded-full bg-stone-100 px-2.5 py-0.5 text-xs font-medium text-stone-600"
+            >
+              {alias}
+              <button
+                type="button"
+                onClick={() =>
+                  setNewAliases((prev) => prev.filter((_, j) => j !== i))
+                }
+                className="ml-0.5 hover:text-red-500"
+              >
+                <X size={10} />
+              </button>
+            </span>
+          ))}
+          <div className="flex items-center gap-1">
+            <input
+              type="text"
+              placeholder="Add alias..."
+              value={newAliasInput}
+              onChange={(e) => setNewAliasInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleAddAlias();
+                }
+              }}
+              className="w-32 rounded-lg border border-stone-300 bg-white px-2 py-1 text-xs focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+            />
+            <button
+              type="button"
+              onClick={handleAddAlias}
+              className="rounded p-1 text-stone-400 hover:text-brand-600 transition-colors"
+            >
+              <Plus size={14} />
+            </button>
+          </div>
+        </div>
+
+        <div className="flex justify-end">
+          <Button type="submit" disabled={!newName.trim() || submitting}>
+            {submitting ? (
+              <Spinner className="h-4 w-4" />
+            ) : (
+              <Plus size={16} />
+            )}
+            {submitting ? "Adding..." : "Add Ingredient"}
+          </Button>
+        </div>
+      </form>
+
+      {/* Ingredient list grouped by category */}
+      {categoryKeys.length > 0 ? (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-stone-500">
+              {ingredients.length} ingredient
+              {ingredients.length !== 1 ? "s" : ""}
+            </span>
+            <button
+              onClick={allCollapsed ? expandAll : collapseAll}
+              className="flex items-center gap-1.5 text-xs text-stone-500 hover:text-stone-700 transition-colors"
+            >
+              {allCollapsed ? (
+                <>
+                  <ChevronsUpDown size={14} /> Expand all
+                </>
+              ) : (
+                <>
+                  <ChevronsDownUp size={14} /> Collapse all
+                </>
+              )}
+            </button>
+          </div>
+
+          {Object.entries(grouped).map(([category, catItems]) => {
+            const isCollapsed = collapsedCategories.has(category);
+            return (
+              <section key={category}>
+                <button
+                  onClick={() => toggleCategory(category)}
+                  className="flex w-full items-center gap-2 mb-2 group"
+                >
+                  {isCollapsed ? (
+                    <ChevronRight
+                      size={16}
+                      className="text-stone-400 group-hover:text-stone-600 transition-colors"
+                    />
+                  ) : (
+                    <ChevronDown
+                      size={16}
+                      className="text-stone-400 group-hover:text-stone-600 transition-colors"
+                    />
+                  )}
+                  <h2 className="text-sm font-semibold uppercase tracking-wider text-stone-500 group-hover:text-stone-700 transition-colors">
+                    {category}
+                  </h2>
+                  <span className="text-xs text-stone-400">
+                    ({catItems.length})
+                  </span>
+                </button>
+
+                {!isCollapsed && (
+                  <div className="space-y-1">
+                    {catItems.map((item) =>
+                      editingId === item.id && editState ? (
+                        <div
+                          key={item.id}
+                          className="space-y-3 rounded-lg border-2 border-brand-300 bg-brand-50/30 px-4 py-3"
+                        >
+                          <div className="flex flex-col sm:flex-row gap-2">
+                            <input
+                              value={editState.name}
+                              onChange={(e) =>
+                                setEditState((s) =>
+                                  s ? { ...s, name: e.target.value } : s
+                                )
+                              }
+                              placeholder="Name (English)"
+                              className="flex-1 rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                              autoFocus
+                            />
+                            <input
+                              value={editState.nameGr}
+                              onChange={(e) =>
+                                setEditState((s) =>
+                                  s ? { ...s, nameGr: e.target.value } : s
+                                )
+                              }
+                              placeholder="Name (Greek)"
+                              className="flex-1 rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                            />
+                            <select
+                              value={editState.category}
+                              onChange={(e) =>
+                                setEditState((s) =>
+                                  s
+                                    ? {
+                                        ...s,
+                                        category:
+                                          e.target.value as IngredientCategory,
+                                      }
+                                    : s
+                                )
+                              }
+                              className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-700 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                            >
+                              {INGREDIENT_CATEGORIES.map((cat) => (
+                                <option key={cat} value={cat}>
+                                  {cat}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {/* Edit aliases */}
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-xs text-stone-500">
+                              Aliases:
+                            </span>
+                            {editState.aliases.map((alias, i) => (
+                              <span
+                                key={i}
+                                className="inline-flex items-center gap-1 rounded-full bg-stone-100 px-2.5 py-0.5 text-xs font-medium text-stone-600"
+                              >
+                                {alias}
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setEditState((s) =>
+                                      s
+                                        ? {
+                                            ...s,
+                                            aliases: s.aliases.filter(
+                                              (_, j) => j !== i
+                                            ),
+                                          }
+                                        : s
+                                    )
+                                  }
+                                  className="ml-0.5 hover:text-red-500"
+                                >
+                                  <X size={10} />
+                                </button>
+                              </span>
+                            ))}
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="text"
+                                placeholder="Add alias..."
+                                value={editState.aliasInput}
+                                onChange={(e) =>
+                                  setEditState((s) =>
+                                    s
+                                      ? { ...s, aliasInput: e.target.value }
+                                      : s
+                                  )
+                                }
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    handleEditAddAlias();
+                                  }
+                                }}
+                                className="w-32 rounded-lg border border-stone-300 bg-white px-2 py-1 text-xs focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                              />
+                              <button
+                                type="button"
+                                onClick={handleEditAddAlias}
+                                className="rounded p-1 text-stone-400 hover:text-brand-600 transition-colors"
+                              >
+                                <Plus size={14} />
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 pt-1">
+                            <button
+                              onClick={() => saveEdit(item)}
+                              disabled={!editState.name.trim() || saving}
+                              className="flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50 transition-colors"
+                            >
+                              {saving && <Spinner className="h-3 w-3" />}
+                              Save
+                            </button>
+                            <button
+                              onClick={cancelEditing}
+                              disabled={saving}
+                              className="rounded-lg px-3 py-1.5 text-xs text-stone-500 hover:bg-stone-100 transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div
+                          key={item.id}
+                          className="flex items-center justify-between rounded-lg border border-stone-200 bg-white px-4 py-2.5"
+                        >
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-sm font-medium text-stone-800">
+                                {item.name}
+                              </span>
+                              {item.nameGr && (
+                                <span className="text-sm italic text-stone-400">
+                                  ({item.nameGr})
+                                </span>
+                              )}
+                            </div>
+                            {item.aliases.length > 0 && (
+                              <div className="mt-0.5 flex flex-wrap gap-1">
+                                {item.aliases.map((alias, i) => (
+                                  <span
+                                    key={i}
+                                    className="rounded bg-stone-50 px-1.5 py-0.5 text-[10px] text-stone-400"
+                                  >
+                                    {alias}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <button
+                              onClick={() => startEditing(item)}
+                              className="p-1 text-stone-400 hover:text-brand-600 transition-colors"
+                              title="Edit"
+                            >
+                              <Pencil size={14} />
+                            </button>
+                            <button
+                              onClick={() => setDeleteId(item.id)}
+                              className="p-1 text-stone-400 hover:text-red-500 transition-colors"
+                              title="Delete"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    )}
+                  </div>
+                )}
+              </section>
+            );
+          })}
+        </div>
+      ) : (
+        <EmptyState
+          icon={<Egg size={48} />}
+          title="No ingredients yet"
+          description="Build your master ingredient list. Recipes and pantry items will link to these for accurate matching."
+        />
+      )}
+
+      <ConfirmDialog
+        open={!!deleteId}
+        title="Delete ingredient"
+        message="Are you sure? Existing recipes and pantry items that reference this ingredient will fall back to text matching."
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteId(null)}
+      />
+    </div>
+  );
+}

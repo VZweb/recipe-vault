@@ -5,16 +5,18 @@ import { useRecipe, useRecipeMutations } from "@/hooks/useRecipes";
 import { useTags } from "@/hooks/useTags";
 import { useCategories } from "@/hooks/useCategories";
 import { useImageUpload } from "@/hooks/useImageUpload";
+import { useIngredients } from "@/hooks/useIngredients";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { TagChip } from "@/components/ui/TagChip";
 import { CategoryIcon } from "@/components/ui/CategoryIcon";
 import { Spinner } from "@/components/ui/Spinner";
+import { IngredientAutocomplete } from "@/components/ui/IngredientAutocomplete";
 import type { Ingredient, Step, RecipeFormData } from "@/types/recipe";
 
 function emptyIngredient(sortOrder: number): Ingredient {
-  return { name: "", nameSecondary: "", quantity: null, unit: "", sortOrder };
+  return { name: "", nameSecondary: "", quantity: null, unit: "", sortOrder, masterIngredientId: null };
 }
 
 function emptyStep(sortOrder: number): Step {
@@ -45,6 +47,7 @@ export function RecipeEditorPage() {
   const { categories } = useCategories();
   const { create, update } = useRecipeMutations();
   const { upload, uploading } = useImageUpload();
+  const { ingredients: masterIngredients } = useIngredients();
 
   const [form, setForm] = useState<RecipeFormData>(defaultForm);
   const [saving, setSaving] = useState(false);
@@ -471,12 +474,19 @@ export function RecipeEditorPage() {
                 onChange={(e) => updateIngredient(idx, { unit: e.target.value })}
                 className="w-20 rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
               />
-              <input
-                type="text"
-                placeholder="Ingredient name"
+              <IngredientAutocomplete
+                ingredients={masterIngredients}
                 value={ing.name}
-                onChange={(e) => updateIngredient(idx, { name: e.target.value })}
+                placeholder="Ingredient name"
                 className="flex-1 rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                onChange={(v) => updateIngredient(idx, { name: v, masterIngredientId: null })}
+                onSelect={(mi) =>
+                  updateIngredient(idx, {
+                    name: mi.name,
+                    nameSecondary: mi.nameGr,
+                    masterIngredientId: mi.id,
+                  })
+                }
               />
               <input
                 type="text"
@@ -484,6 +494,7 @@ export function RecipeEditorPage() {
                 value={ing.nameSecondary}
                 onChange={(e) => updateIngredient(idx, { nameSecondary: e.target.value })}
                 className="w-28 rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-sm italic text-stone-500 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                readOnly={!!ing.masterIngredientId}
               />
               <button
                 type="button"

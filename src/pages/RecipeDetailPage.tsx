@@ -54,8 +54,14 @@ export function RecipeDetailPage() {
     await incrementCooked(recipe.id);
   };
 
+  const pantryMasterIds = useMemo(
+    () => new Set(pantryItems.map((p) => p.masterIngredientId).filter(Boolean)),
+    [pantryItems]
+  );
+
   const pantryNames = useMemo(() => {
-    const normalize = (s: string) => s.toLowerCase().trim().replace(/\s+/g, " ");
+    const normalize = (s: string) =>
+      s.toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/ς/g, "σ").replace(/\s+/g, " ");
     return pantryItems.flatMap((p) => {
       const names = [normalize(p.name)];
       if (p.nameSecondary) names.push(normalize(p.nameSecondary));
@@ -64,15 +70,19 @@ export function RecipeDetailPage() {
   }, [pantryItems]);
 
   const isInPantry = useCallback(
-    (name: string, nameSecondary?: string) => {
-      const normalize = (s: string) => s.toLowerCase().trim().replace(/\s+/g, " ");
+    (name: string, nameSecondary?: string, masterIngredientId?: string | null) => {
+      if (masterIngredientId && pantryMasterIds.has(masterIngredientId)) {
+        return true;
+      }
+      const normalize = (s: string) =>
+        s.toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/ς/g, "σ").replace(/\s+/g, " ");
       const candidates = [normalize(name)];
       if (nameSecondary?.trim()) candidates.push(normalize(nameSecondary));
       return pantryNames.some((p) =>
         candidates.some((c) => c.includes(p) || p.includes(c))
       );
     },
-    [pantryNames]
+    [pantryNames, pantryMasterIds]
   );
 
   if (loading) {
@@ -288,7 +298,7 @@ export function RecipeDetailPage() {
             </h2>
             {pantryItems.length > 0 && (
               <span className="text-xs text-stone-400">
-                {recipe.ingredients.filter((ing) => isInPantry(ing.name, ing.nameSecondary)).length}
+                {recipe.ingredients.filter((ing) => isInPantry(ing.name, ing.nameSecondary, ing.masterIngredientId)).length}
                 /{recipe.ingredients.length} in pantry
               </span>
             )}
@@ -297,7 +307,7 @@ export function RecipeDetailPage() {
             {recipe.ingredients
               .sort((a, b) => a.sortOrder - b.sortOrder)
               .map((ing, i) => {
-                const inPantry = isInPantry(ing.name, ing.nameSecondary);
+                const inPantry = isInPantry(ing.name, ing.nameSecondary, ing.masterIngredientId);
                 return (
                   <li
                     key={i}

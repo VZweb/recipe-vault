@@ -2,6 +2,7 @@ import { Outlet, NavLink } from "react-router-dom";
 import {
   BookOpen,
   ChefHat,
+  Egg,
   FolderOpen,
   Home,
   Package,
@@ -14,6 +15,7 @@ const navItems = [
   { to: "/recipes", icon: BookOpen, label: "Recipes" },
   { to: "/suggestions", icon: ChefHat, label: "Cook" },
   { to: "/pantry", icon: Package, label: "Pantry" },
+  { to: "/ingredients", icon: Egg, label: "Ingredients" },
   { to: "/categories", icon: FolderOpen, label: "Categories" },
   { to: "/tags", icon: Tags, label: "Tags" },
 ];

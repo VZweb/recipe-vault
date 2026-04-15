@@ -1,5 +1,6 @@
 import type { Recipe } from "@/types/recipe";
 import type { PantryItem } from "@/types/pantry";
+import { normalizeText } from "@/lib/normalize";
 
 export interface SuggestionResult {
   recipe: Recipe;
@@ -10,33 +11,47 @@ export interface SuggestionResult {
   missingIngredients: string[];
 }
 
-function normalize(s: string): string {
-  return s.toLowerCase().trim().replace(/\s+/g, " ");
-}
-
 export function suggestRecipes(
   recipes: Recipe[],
   availableIngredients: string[],
   pantryItems: PantryItem[]
 ): SuggestionResult[] {
+  const availableMasterIds = new Set(
+    pantryItems.map((p) => p.masterIngredientId).filter(Boolean)
+  );
+
+  const stapleIds = new Set(
+    pantryItems
+      .filter((p) => p.isStaple && p.masterIngredientId)
+      .map((p) => p.masterIngredientId!)
+  );
+
   const available = new Set([
-    ...availableIngredients.map(normalize),
+    ...availableIngredients.map(normalizeText),
     ...pantryItems
       .filter((p) => p.isStaple)
       .flatMap((p) => {
-        const names = [normalize(p.name)];
-        if (p.nameSecondary) names.push(normalize(p.nameSecondary));
+        const names = [normalizeText(p.name)];
+        if (p.nameSecondary) names.push(normalizeText(p.nameSecondary));
         return names;
       }),
   ]);
+
+  const allMasterIds = new Set([...availableMasterIds, ...stapleIds]);
 
   const results: SuggestionResult[] = recipes.map((recipe) => {
     const matched: string[] = [];
     const missing: string[] = [];
 
     for (const ing of recipe.ingredients) {
-      const candidates = [normalize(ing.name)];
-      if (ing.nameSecondary?.trim()) candidates.push(normalize(ing.nameSecondary));
+      if (ing.masterIngredientId && allMasterIds.has(ing.masterIngredientId)) {
+        matched.push(ing.name);
+        continue;
+      }
+
+      const candidates = [normalizeText(ing.name)];
+      if (ing.nameSecondary?.trim())
+        candidates.push(normalizeText(ing.nameSecondary));
       const isAvailable = Array.from(available).some((a) =>
         candidates.some((c) => c.includes(a) || a.includes(c))
       );
@@ -53,7 +68,8 @@ export function suggestRecipes(
       recipe,
       matchedCount: matched.length,
       totalCount: total,
-      matchPercentage: total > 0 ? Math.round((matched.length / total) * 100) : 0,
+      matchPercentage:
+        total > 0 ? Math.round((matched.length / total) * 100) : 0,
       matchedIngredients: matched,
       missingIngredients: missing,
     };
