@@ -75,8 +75,11 @@ export function IngredientAutocomplete({
       setHighlightIdx((i) => (i > 0 ? i - 1 : filtered.length - 1));
     } else if (e.key === "Enter" && highlightIdx >= 0) {
       e.preventDefault();
-      onSelect(filtered[highlightIdx]);
-      setOpen(false);
+      const selected = filtered[highlightIdx];
+      if (selected) {
+        onSelect(selected);
+        setOpen(false);
+      }
     } else if (e.key === "Escape") {
       setOpen(false);
     }
