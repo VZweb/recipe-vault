@@ -28,6 +28,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Spinner } from "@/components/ui/Spinner";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { IngredientAutocomplete } from "@/components/ui/IngredientAutocomplete";
 import type { PantryItem, PantryCategory } from "@/types/pantry";
 import { PANTRY_CATEGORIES, PANTRY_UNITS } from "@/types/pantry";
@@ -70,6 +71,7 @@ export function PantryPage() {
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(
     new Set()
   );
+  const [duplicateMatch, setDuplicateMatch] = useState<PantryItem | null>(null);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editState, setEditState] = useState<EditState | null>(null);
   const [saving, setSaving] = useState(false);
@@ -109,10 +111,15 @@ export function PantryPage() {
     setNewImagePreview(URL.createObjectURL(file));
   };
 
-  const handleAdd = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newName.trim()) return;
+  const findDuplicate = (name: string, masterId: string | null): PantryItem | undefined => {
+    if (masterId) {
+      return items.find((i) => i.masterIngredientId === masterId);
+    }
+    const norm = normalizeText(name);
+    return items.find((i) => normalizeText(i.name) === norm);
+  };
 
+  const commitAdd = async () => {
     setSubmitting(true);
     try {
       const qty = newQuantity ? Number(newQuantity) : null;
@@ -170,6 +177,19 @@ export function PantryPage() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleAdd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newName.trim()) return;
+
+    const existing = findDuplicate(newName.trim(), newMasterIngredientId);
+    if (existing) {
+      setDuplicateMatch(existing);
+      return;
+    }
+
+    await commitAdd();
   };
 
   const handleToggleStaple = async (item: PantryItem) => {
@@ -996,6 +1016,23 @@ export function PantryPage() {
           description="Add items you have at home. Mark staples like salt and oil so they're always counted."
         />
       )}
+
+      <ConfirmDialog
+        open={!!duplicateMatch}
+        title="Duplicate item"
+        message={
+          duplicateMatch
+            ? `"${duplicateMatch.name}" is already in your pantry${duplicateMatch.category ? ` (${duplicateMatch.category})` : ""}. Add it anyway?`
+            : ""
+        }
+        confirmLabel="Add anyway"
+        variant="primary"
+        onConfirm={async () => {
+          setDuplicateMatch(null);
+          await commitAdd();
+        }}
+        onCancel={() => setDuplicateMatch(null)}
+      />
     </div>
   );
 }

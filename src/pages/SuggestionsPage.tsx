@@ -3,21 +3,35 @@ import { Link } from "react-router-dom";
 import { ChefHat, Clock, Percent, Users } from "lucide-react";
 import { useRecipes } from "@/hooks/useRecipes";
 import { useTags } from "@/hooks/useTags";
+import { useIngredients } from "@/hooks/useIngredients";
 import { fetchPantryItems } from "@/lib/firestore";
 import { suggestRecipes, type SuggestionResult } from "@/lib/suggestions";
 import { Button } from "@/components/ui/Button";
 import { TagChip } from "@/components/ui/TagChip";
 import { Spinner } from "@/components/ui/Spinner";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { IngredientAutocomplete } from "@/components/ui/IngredientAutocomplete";
 import type { PantryItem } from "@/types/pantry";
+
+interface ExtraIngredient {
+  name: string;
+  nameSecondary: string;
+  masterIngredientId: string | null;
+}
 
 export function SuggestionsPage() {
   const { recipes, loading: loadingRecipes } = useRecipes();
   const { tags } = useTags();
+  const { ingredients: masterIngredients } = useIngredients();
   const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
   const [loadingPantry, setLoadingPantry] = useState(true);
   const [extraIngredient, setExtraIngredient] = useState("");
-  const [extraIngredients, setExtraIngredients] = useState<string[]>([]);
+  const [extraIngredients, setExtraIngredients] = useState<ExtraIngredient[]>([]);
+  const [pendingExtra, setPendingExtra] = useState<ExtraIngredient>({
+    name: "",
+    nameSecondary: "",
+    masterIngredientId: null,
+  });
 
   const loadPantry = useCallback(async () => {
     setLoadingPantry(true);
@@ -38,21 +52,55 @@ export function SuggestionsPage() {
       ...pantryItems.flatMap((p) =>
         p.nameSecondary ? [p.name, p.nameSecondary] : [p.name]
       ),
-      ...extraIngredients,
+      ...extraIngredients.flatMap((e) =>
+        e.nameSecondary ? [e.name, e.nameSecondary] : [e.name]
+      ),
+    ],
+    [pantryItems, extraIngredients]
+  );
+
+  const combinedPantry = useMemo<PantryItem[]>(
+    () => [
+      ...pantryItems,
+      ...extraIngredients
+        .filter((e) => e.masterIngredientId)
+        .map((e) => ({
+          id: `extra-${e.masterIngredientId}`,
+          name: e.name,
+          nameSecondary: e.nameSecondary || null,
+          normalizedName: e.name.toLowerCase(),
+          category: "Other" as const,
+          quantity: null,
+          unit: null,
+          isStaple: false,
+          imageUrl: null,
+          masterIngredientId: e.masterIngredientId,
+          note: "",
+          addedAt: new Date(),
+        })),
     ],
     [pantryItems, extraIngredients]
   );
 
   const suggestions = useMemo(
-    () => suggestRecipes(recipes, allAvailable, pantryItems),
-    [recipes, allAvailable, pantryItems]
+    () => suggestRecipes(recipes, allAvailable, combinedPantry),
+    [recipes, allAvailable, combinedPantry]
   );
 
   const handleAddExtra = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!extraIngredient.trim()) return;
-    setExtraIngredients((prev) => [...prev, extraIngredient.trim()]);
+    const name = extraIngredient.trim();
+    if (!name) return;
+    setExtraIngredients((prev) => [
+      ...prev,
+      {
+        name: pendingExtra.masterIngredientId ? pendingExtra.name : name,
+        nameSecondary: pendingExtra.nameSecondary,
+        masterIngredientId: pendingExtra.masterIngredientId,
+      },
+    ]);
     setExtraIngredient("");
+    setPendingExtra({ name: "", nameSecondary: "", masterIngredientId: null });
   };
 
   const loading = loadingRecipes || loadingPantry;
@@ -70,12 +118,20 @@ export function SuggestionsPage() {
         onSubmit={handleAddExtra}
         className="flex gap-2"
       >
-        <input
-          type="text"
-          placeholder="Add an ingredient not in your pantry..."
+        <IngredientAutocomplete
+          ingredients={masterIngredients}
           value={extraIngredient}
-          onChange={(e) => setExtraIngredient(e.target.value)}
-          className="flex-1 rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+          placeholder="Add an ingredient not in your pantry..."
+          wrapperClassName="flex-1"
+          className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+          onChange={(v) => {
+            setExtraIngredient(v);
+            setPendingExtra({ name: v, nameSecondary: "", masterIngredientId: null });
+          }}
+          onSelect={(mi) => {
+            setExtraIngredient(mi.name);
+            setPendingExtra({ name: mi.name, nameSecondary: mi.nameGr, masterIngredientId: mi.id });
+          }}
         />
         <Button type="submit" variant="secondary" disabled={!extraIngredient.trim()}>
           Add
@@ -88,14 +144,18 @@ export function SuggestionsPage() {
           {extraIngredients.map((ing, i) => (
             <span
               key={i}
-              className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2.5 py-0.5 text-xs font-medium text-sky-700"
+              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                ing.masterIngredientId
+                  ? "bg-brand-50 text-brand-700"
+                  : "bg-sky-50 text-sky-700"
+              }`}
             >
-              {ing}
+              {ing.name}
               <button
                 onClick={() =>
                   setExtraIngredients((prev) => prev.filter((_, j) => j !== i))
                 }
-                className="ml-0.5 hover:text-sky-900"
+                className="ml-0.5 hover:opacity-70"
               >
                 x
               </button>

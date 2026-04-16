@@ -43,6 +43,7 @@ export function IngredientsPage() {
   const [editState, setEditState] = useState<EditState | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [duplicateMatch, setDuplicateMatch] = useState<MasterIngredient | null>(null);
 
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -70,10 +71,19 @@ export function IngredientsPage() {
     setNewAliasInput("");
   };
 
-  const handleAdd = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newName.trim()) return;
+  const findDuplicate = (name: string, nameGr: string, aliases: string[]): MasterIngredient | undefined => {
+    const incoming = [name, nameGr, ...aliases].map(normalizeText).filter(Boolean);
+    return ingredients.find((ing) => {
+      const existing = [
+        normalizeText(ing.name),
+        normalizeText(ing.nameGr),
+        ...ing.aliases.map(normalizeText),
+      ].filter(Boolean);
+      return incoming.some((i) => existing.some((e) => i === e));
+    });
+  };
 
+  const commitAdd = async () => {
     setSubmitting(true);
     try {
       await add({
@@ -90,6 +100,19 @@ export function IngredientsPage() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleAdd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newName.trim()) return;
+
+    const existing = findDuplicate(newName.trim(), newNameGr.trim(), newAliases);
+    if (existing) {
+      setDuplicateMatch(existing);
+      return;
+    }
+
+    await commitAdd();
   };
 
   const startEditing = (item: MasterIngredient) => {
@@ -552,6 +575,23 @@ export function IngredientsPage() {
         variant="danger"
         onConfirm={handleDelete}
         onCancel={() => setDeleteId(null)}
+      />
+
+      <ConfirmDialog
+        open={!!duplicateMatch}
+        title="Possible duplicate"
+        message={
+          duplicateMatch
+            ? `"${duplicateMatch.name}"${duplicateMatch.nameGr ? ` (${duplicateMatch.nameGr})` : ""} already exists in the catalog under ${duplicateMatch.category}. Add it anyway?`
+            : ""
+        }
+        confirmLabel="Add anyway"
+        variant="primary"
+        onConfirm={async () => {
+          setDuplicateMatch(null);
+          await commitAdd();
+        }}
+        onCancel={() => setDuplicateMatch(null)}
       />
     </div>
   );
