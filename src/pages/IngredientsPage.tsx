@@ -1,10 +1,12 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  Check,
   ChevronDown,
   ChevronRight,
   ChevronsDownUp,
   ChevronsUpDown,
   Egg,
+  Package,
   Pencil,
   Plus,
   Search,
@@ -13,6 +15,8 @@ import {
 } from "lucide-react";
 import { useIngredients } from "@/hooks/useIngredients";
 import { normalizeText } from "@/lib/normalize";
+import { addPantryItem, fetchPantryItems } from "@/lib/firestore";
+import type { PantryItem } from "@/types/pantry";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Spinner } from "@/components/ui/Spinner";
@@ -44,6 +48,35 @@ export function IngredientsPage() {
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [duplicateMatch, setDuplicateMatch] = useState<MasterIngredient | null>(null);
+
+  const [pantryIds, setPantryIds] = useState<Set<string>>(new Set());
+  const [addedToPantry, setAddedToPantry] = useState<Set<string>>(new Set());
+
+  const loadPantryIds = useCallback(async () => {
+    const items = await fetchPantryItems();
+    setPantryIds(new Set(items.map((i: PantryItem) => i.masterIngredientId).filter(Boolean) as string[]));
+  }, []);
+
+  useEffect(() => {
+    void loadPantryIds();
+  }, [loadPantryIds]);
+
+  const handleAddToPantry = async (item: MasterIngredient) => {
+    await addPantryItem({
+      name: item.name,
+      nameSecondary: item.nameGr || null,
+      normalizedName: item.name.toLowerCase(),
+      category: item.category as PantryItem["category"],
+      quantity: null,
+      unit: null,
+      isStaple: false,
+      imageUrl: null,
+      masterIngredientId: item.id,
+      note: "",
+    });
+    setPantryIds((prev) => new Set(prev).add(item.id));
+    setAddedToPantry((prev) => new Set(prev).add(item.id));
+  };
 
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -535,6 +568,24 @@ export function IngredientsPage() {
                           </div>
 
                           <div className="flex items-center gap-2 flex-shrink-0">
+                            {pantryIds.has(item.id) ? (
+                              <span
+                                className="flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-medium text-green-600"
+                                title="In pantry"
+                              >
+                                <Check size={10} />
+                                {addedToPantry.has(item.id) ? "Added" : "In pantry"}
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => handleAddToPantry(item)}
+                                className="flex items-center gap-1 rounded-full border border-stone-200 px-2 py-0.5 text-[10px] font-medium text-stone-500 hover:border-brand-300 hover:text-brand-600 transition-colors"
+                                title="Add to pantry"
+                              >
+                                <Package size={10} />
+                                Pantry
+                              </button>
+                            )}
                             <button
                               onClick={() => startEditing(item)}
                               className="p-1 text-stone-400 hover:text-brand-600 transition-colors"
