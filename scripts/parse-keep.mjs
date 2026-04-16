@@ -96,7 +96,9 @@ function extractNoteFromJson(json) {
     ? new Date(json.createdTimestampUsec / 1000)
     : null;
 
-  return { title, lines, labels, annotations, createdAt, archived: !!json.isArchived };
+  const isChecklist = !!(json.listContent && json.listContent.length > 0);
+
+  return { title, lines, labels, annotations, createdAt, archived: !!json.isArchived, isChecklist };
 }
 
 // ---------------------------------------------------------------------------
@@ -170,6 +172,8 @@ function looksLikeIngredient(line) {
   if (QUANTITY_RE.test(line)) return true;
   if (/^[-•*]\s/.test(line) && line.length < 80) return true;
   if (/^[-•*]?\s*\d/.test(line) && line.length < 80) return true;
+  if (/^\([\d.]+\s*(?:ml|g|kg|oz|lb|lbs|cups?|tbsp|tsp)\)/i.test(line)) return true;
+  if (/^(?:κ\.σ\.?|κ\.γ\.?|γρ\.?|φλ\.?|τεμ\.?|κλ\.?|κομ\.?|φετ\.?|πακ\.?|μπουκ\.?|σκ\.?)\s/i.test(line) && line.length < 80) return true;
   return false;
 }
 
@@ -201,6 +205,10 @@ function normalizeUnit(raw) {
 
 function cleanIngredientName(name) {
   return name
+    // Strip Greek unit abbreviation prefixes (with or without trailing space)
+    .replace(/^(?:κ\.σ\.?|κ\.γ\.?|γρ\.?|φλ\.?|τεμ\.?|σκ\.?|κλ\.?|κομ\.?|φετ\.?|πακ\.?|μπουκ\.?)\s*/i, "")
+    // Strip English unit-like prefixes that leak through: (15-ounce), (3 pound), (4 quarts)
+    .replace(/^\([\d.,-]+\s*(?:ounce|oz|pound|lb|quart|cup|pint)s?\)\s*/i, "")
     // Strip cost annotations: ($5.25), ($0.10)
     .replace(/\(\$[\d.]+\)/g, "")
     // Strip parenthetical weight/volume duplicates: (30ml), (50g), (about 1.3 lb. total)
@@ -236,8 +244,19 @@ function parseQuantity(qtyStr) {
   }
 }
 
+// Greek unit abbreviation at start of line WITHOUT a leading digit
+// e.g. "κ.σ. βασιλικό", "γρ. παρμεζάνα", "κλ. θυμάρι"
+const GREEK_UNIT_PREFIX_RE =
+  /^(κ\.σ\.?|κ\.γ\.?|γρ\.?|φλ\.?|τεμ\.?|κλ\.?|κομ\.?|φετ\.?|πακ\.?|μπουκ\.?|σκ\.?)\s+/i;
+
+// Parenthetical quantity at start: (50g), (32g), (about 1.3 lb)
+const PAREN_QTY_RE =
+  /^\((?:about\s+)?([\d.]+)\s*(ml|g|kg|oz|lb|lbs|cups?|tbsp|tsp)?\)\s*/i;
+
 function parseIngredientLine(raw) {
   const clean = raw.replace(/^[-•*]\s*/, "").trim();
+
+  // Priority 1: standard "2 cups flour" pattern
   const match = clean.match(QUANTITY_RE);
   if (match) {
     const qtyStr = match[1].trim();
@@ -247,6 +266,25 @@ function parseIngredientLine(raw) {
     const quantity = parseQuantity(qtyStr);
     return { name: name || clean, quantity, unit };
   }
+
+  // Priority 2: parenthetical quantity "(50g) scallions"
+  const parenMatch = clean.match(PAREN_QTY_RE);
+  if (parenMatch) {
+    const quantity = parseQuantity(parenMatch[1]);
+    const unit = parenMatch[2] ? normalizeUnit(parenMatch[2]) : "";
+    const name = cleanIngredientName(clean.slice(parenMatch[0].length));
+    return { name: name || clean, quantity, unit };
+  }
+
+  // Priority 3: Greek unit prefix without a digit ("κ.σ. βασιλικό")
+  const unitMatch = clean.match(GREEK_UNIT_PREFIX_RE);
+  if (unitMatch) {
+    const rawUnit = unitMatch[1].replace(/\.$/, "").trim();
+    const unit = normalizeUnit(rawUnit);
+    const name = cleanIngredientName(clean.slice(unitMatch[0].length));
+    return { name: name || clean, quantity: null, unit };
+  }
+
   return { name: cleanIngredientName(clean), quantity: null, unit: "" };
 }
 
@@ -256,13 +294,40 @@ function isVideoUrl(url) {
   return VIDEO_URL_RE.test(url);
 }
 
-function parseRecipeContent(title, lines, annotations) {
+// Greek sub-section headers like "Για το κότσι", "Για τη σάλτσα", "Για τη γέμιση"
+// These are ingredient group labels — skip them (app has no grouping support)
+const SUB_SECTION_RE = /^για\s+τ[οηα]\w?\s+/i;
+
+// Cook/prep time in title: (240'), (30 λεπτά), (45'), (1h30), (1.5h)
+function extractTimeFromTitle(title) {
+  let cookTimeMin = null;
+  let cleanTitle = title;
+
+  const match = title.match(/\((\d+)['΄']\)/);
+  if (match) {
+    cookTimeMin = Number(match[1]) || null;
+    cleanTitle = title.replace(match[0], "").trim();
+  } else {
+    const matchMin = title.match(/\((\d+)\s*(?:λεπτά|min|minutes)\)/i);
+    if (matchMin) {
+      cookTimeMin = Number(matchMin[1]) || null;
+      cleanTitle = title.replace(matchMin[0], "").trim();
+    }
+  }
+
+  return { cleanTitle, cookTimeMin };
+}
+
+function parseRecipeContent(title, lines, annotations, { isChecklist = false } = {}) {
   const ingredients = [];
   const steps = [];
   let description = "";
   let servings = null;
   let sourceUrl = "";
   let videoUrl = "";
+
+  // Extract cook time from title pattern like "(240')"
+  const { cleanTitle, cookTimeMin } = extractTimeFromTitle(title);
 
   // Pull URL and description from web-link annotations first
   if (annotations.length > 0) {
@@ -277,7 +342,8 @@ function parseRecipeContent(title, lines, annotations) {
     if (ann.description) description = ann.description;
   }
 
-  let mode = "auto"; // auto | ingredients | steps
+  // Checklist notes are typically ingredient/shopping lists — default to ingredients mode
+  let mode = isChecklist ? "ingredients" : "auto";
 
   for (const line of lines) {
     // Detect URLs
@@ -308,13 +374,18 @@ function parseRecipeContent(title, lines, annotations) {
       continue;
     }
 
-    // Section header detection
+    // Section header detection (explicit ingredient/step headers)
     if (isSectionHeader(line, SECTION_HEADERS_INGREDIENTS)) {
       mode = "ingredients";
       continue;
     }
     if (isSectionHeader(line, SECTION_HEADERS_STEPS)) {
       mode = "steps";
+      continue;
+    }
+
+    // Greek sub-section headers ("Για το κότσι", "Για τη σάλτσα") — skip
+    if (SUB_SECTION_RE.test(line.trim())) {
       continue;
     }
 
@@ -353,11 +424,11 @@ function parseRecipeContent(title, lines, annotations) {
   }
 
   return {
-    title,
+    title: cleanTitle,
     description,
     servings,
     prepTimeMin: null,
-    cookTimeMin: null,
+    cookTimeMin,
     sourceUrl,
     videoUrl,
     imageUrls: [],
@@ -434,7 +505,8 @@ for (const file of jsonFiles) {
   const recipe = parseRecipeContent(
     recipeTitle,
     note.lines,
-    note.annotations
+    note.annotations,
+    { isChecklist: note.isChecklist }
   );
 
   recipe.tags = note.labels;

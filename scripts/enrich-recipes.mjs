@@ -92,6 +92,23 @@ function normalize(s) {
     .replace(/\s+/g, " ");
 }
 
+// Strip unit prefixes / qualifiers that leak into ingredient names
+const UNIT_PREFIX_RE =
+  /^(?:κ\.σ\.?|κ\.γ\.?|γρ\.?|φλ\.?|τεμ\.?|σκ\.?|κλ\.?|κομ\.?|φετ\.?|πακ\.?|μπουκ\.?)\s+/i;
+
+const PAREN_QTY_RE =
+  /^\((?:about\s+)?[\d.]+\s*(?:ml|g|kg|oz|lb|lbs|cups?|tbsp|tsp)?\)\s*/i;
+
+function cleanForMatching(name) {
+  let s = name.trim();
+  s = s.replace(UNIT_PREFIX_RE, "");
+  s = s.replace(PAREN_QTY_RE, "");
+  s = s.replace(/^(?:of|από)\s+/i, "");
+  s = s.replace(/,\s.*$/, "");
+  s = s.replace(/\s+/g, " ").trim();
+  return s;
+}
+
 // ---------------------------------------------------------------------------
 // Load master ingredient catalog
 // ---------------------------------------------------------------------------
@@ -121,23 +138,32 @@ function findBestMatch(ingredientName, index) {
   const normalized = normalize(ingredientName);
   if (!normalized) return null;
 
+  // Also try a cleaned version (unit prefixes / qualifiers stripped)
+  const cleaned = normalize(cleanForMatching(ingredientName));
+  const candidates = [normalized];
+  if (cleaned && cleaned !== normalized) candidates.push(cleaned);
+
   // Priority 1: exact match against any target
-  for (const entry of index) {
-    if (entry.targets.some((t) => t === normalized)) {
-      return { match: entry.item, type: "exact" };
+  for (const candidate of candidates) {
+    for (const entry of index) {
+      if (entry.targets.some((t) => t === candidate)) {
+        return { match: entry.item, type: "exact" };
+      }
     }
   }
 
   // Priority 2: substring match (either direction)
-  for (const entry of index) {
-    if (
-      entry.targets.some(
-        (t) =>
-          (normalized.includes(t) && t.length >= 3) ||
-          (t.includes(normalized) && normalized.length >= 3)
-      )
-    ) {
-      return { match: entry.item, type: "substring" };
+  for (const candidate of candidates) {
+    for (const entry of index) {
+      if (
+        entry.targets.some(
+          (t) =>
+            (candidate.includes(t) && t.length >= 3) ||
+            (t.includes(candidate) && candidate.length >= 3)
+        )
+      ) {
+        return { match: entry.item, type: "substring" };
+      }
     }
   }
 

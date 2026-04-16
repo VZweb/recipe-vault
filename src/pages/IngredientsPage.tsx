@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   ChevronDown,
   ChevronRight,
@@ -7,10 +7,12 @@ import {
   Egg,
   Pencil,
   Plus,
+  Search,
   Trash2,
   X,
 } from "lucide-react";
 import { useIngredients } from "@/hooks/useIngredients";
+import { normalizeText } from "@/lib/normalize";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Spinner } from "@/components/ui/Spinner";
@@ -42,9 +44,24 @@ export function IngredientsPage() {
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
+  const [searchQuery, setSearchQuery] = useState("");
+
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(
     new Set()
   );
+
+  const filteredIngredients = useMemo(() => {
+    const q = normalizeText(searchQuery);
+    if (!q) return ingredients;
+    return ingredients.filter((ing) => {
+      const targets = [
+        normalizeText(ing.name),
+        normalizeText(ing.nameGr),
+        ...ing.aliases.map(normalizeText),
+      ].filter(Boolean);
+      return targets.some((t) => t.includes(q));
+    });
+  }, [ingredients, searchQuery]);
 
   const handleAddAlias = () => {
     const alias = newAliasInput.trim();
@@ -133,7 +150,7 @@ export function IngredientsPage() {
 
   const grouped = INGREDIENT_CATEGORIES.reduce(
     (acc, cat) => {
-      const catItems = ingredients.filter((i) => i.category === cat);
+      const catItems = filteredIngredients.filter((i) => i.category === cat);
       if (catItems.length > 0) acc[cat] = catItems;
       return acc;
     },
@@ -167,6 +184,26 @@ export function IngredientsPage() {
           Master list of ingredients. Recipes and pantry items link here for
           consistent matching.
         </p>
+      </div>
+
+      {/* Search */}
+      <div className="relative">
+        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+        <input
+          type="text"
+          placeholder="Search ingredients..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full rounded-lg border border-stone-300 bg-white py-2 pl-9 pr-3 text-sm text-stone-900 placeholder:text-stone-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-colors"
+        />
+        {searchQuery && (
+          <button
+            onClick={() => setSearchQuery("")}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 transition-colors"
+          >
+            <X size={14} />
+          </button>
+        )}
       </div>
 
       {/* Add form */}
@@ -265,8 +302,9 @@ export function IngredientsPage() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <span className="text-sm text-stone-500">
-              {ingredients.length} ingredient
-              {ingredients.length !== 1 ? "s" : ""}
+              {searchQuery
+                ? `${filteredIngredients.length} of ${ingredients.length} ingredient${ingredients.length !== 1 ? "s" : ""}`
+                : `${ingredients.length} ingredient${ingredients.length !== 1 ? "s" : ""}`}
             </span>
             <button
               onClick={allCollapsed ? expandAll : collapseAll}

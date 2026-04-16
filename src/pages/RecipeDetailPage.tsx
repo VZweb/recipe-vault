@@ -340,6 +340,11 @@ export function RecipeDetailPage() {
                           <Link2 size={12} />
                         </span>
                       )}
+                      {ing.note && (
+                        <span className="ml-1.5 text-stone-400 italic">
+                          — {ing.note}
+                        </span>
+                      )}
                     </span>
                     {inPantry && (
                       <span className="mt-0.5 flex items-center gap-1 text-[10px] font-medium text-green-700 bg-green-100 rounded-full px-1.5 py-0.5 whitespace-nowrap">

@@ -5,6 +5,7 @@ export interface Ingredient {
   unit: string;
   sortOrder: number;
   masterIngredientId: string | null;
+  note: string;
 }
 
 export interface Step {

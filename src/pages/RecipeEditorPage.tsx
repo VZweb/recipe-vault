@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, GripVertical, ImagePlus, Link, Link2, Plus, Trash2, X } from "lucide-react";
+import { ArrowLeft, GripVertical, ImagePlus, Link, Link2, MessageSquare, Plus, Trash2, X } from "lucide-react";
 import { useRecipe, useRecipeMutations } from "@/hooks/useRecipes";
 import { useTags } from "@/hooks/useTags";
 import { useCategories } from "@/hooks/useCategories";
@@ -16,7 +16,7 @@ import { IngredientAutocomplete } from "@/components/ui/IngredientAutocomplete";
 import type { Ingredient, Step, RecipeFormData } from "@/types/recipe";
 
 function emptyIngredient(sortOrder: number): Ingredient {
-  return { name: "", nameSecondary: "", quantity: null, unit: "", sortOrder, masterIngredientId: null };
+  return { name: "", nameSecondary: "", quantity: null, unit: "", sortOrder, masterIngredientId: null, note: "" };
 }
 
 function emptyStep(sortOrder: number): Step {
@@ -51,6 +51,7 @@ export function RecipeEditorPage() {
 
   const [form, setForm] = useState<RecipeFormData>(defaultForm);
   const [saving, setSaving] = useState(false);
+  const [noteOpenSet, setNoteOpenSet] = useState<Set<number>>(new Set());
   const [previewImages, setPreviewImages] = useState<string[]>([]);
   const [imageUrlInput, setImageUrlInput] = useState("");
   const [showImageUrlInput, setShowImageUrlInput] = useState(false);
@@ -75,6 +76,10 @@ export function RecipeEditorPage() {
         steps: recipe.steps.length > 0 ? recipe.steps : [emptyStep(0)],
       });
       setPreviewImages(recipe.imageUrls);
+      const ings = recipe.ingredients.length > 0 ? recipe.ingredients : [];
+      const openNotes = new Set<number>();
+      ings.forEach((ing, i) => { if (ing.note) openNotes.add(i); });
+      setNoteOpenSet(openNotes);
     }
   }, [recipe, isEditing]);
 
@@ -452,7 +457,7 @@ export function RecipeEditorPage() {
         <h2 className="text-lg font-semibold text-stone-800">Ingredients</h2>
         <div className="space-y-2">
           {form.ingredients.map((ing, idx) => (
-            <div key={idx} className="flex items-center gap-2">
+            <div key={idx} className="flex flex-wrap items-center gap-2">
               <GripVertical size={16} className="text-stone-300 flex-shrink-0" />
               <input
                 type="number"
@@ -478,7 +483,7 @@ export function RecipeEditorPage() {
                 ingredients={masterIngredients}
                 value={ing.name}
                 placeholder="Ingredient name"
-                wrapperClassName="flex-1"
+                wrapperClassName="flex-1 min-w-[180px]"
                 className={`w-full rounded-lg border bg-white px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 ${
                   ing.masterIngredientId
                     ? "border-brand-300 bg-brand-50/30"
@@ -504,14 +509,40 @@ export function RecipeEditorPage() {
                   </span>
                 )
               )}
-              <input
-                type="text"
-                placeholder="Greek name"
-                value={ing.nameSecondary}
-                onChange={(e) => updateIngredient(idx, { nameSecondary: e.target.value })}
-                className="w-28 rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-sm italic text-stone-500 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-                readOnly={!!ing.masterIngredientId}
-              />
+              {noteOpenSet.has(idx) ? (
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <input
+                    type="text"
+                    placeholder="e.g. diced, melted..."
+                    value={ing.note}
+                    onChange={(e) => updateIngredient(idx, { note: e.target.value })}
+                    autoFocus
+                    className="w-40 rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-sm italic text-stone-500 placeholder:text-stone-300 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      updateIngredient(idx, { note: "" });
+                      setNoteOpenSet((prev) => { const next = new Set(prev); next.delete(idx); return next; });
+                    }}
+                    className="p-0.5 text-stone-400 hover:text-stone-600 transition-colors"
+                    title="Remove note"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setNoteOpenSet((prev) => new Set(prev).add(idx))}
+                  className={`p-1 transition-colors flex-shrink-0 ${
+                    ing.note ? "text-brand-500" : "text-stone-300 hover:text-stone-500"
+                  }`}
+                  title="Add note"
+                >
+                  <MessageSquare size={14} />
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => removeIngredient(idx)}
