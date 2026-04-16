@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, ChevronDown, ChevronUp, ClipboardPaste, ImagePlus, LayoutList, Link, Link2, MessageSquare, Plus, Trash2, X } from "lucide-react";
 import { parseIngredientText } from "@/lib/parseIngredients";
+import { parseStepsText } from "@/lib/parseSteps";
 import { useRecipe, useRecipeMutations } from "@/hooks/useRecipes";
 import { useTags } from "@/hooks/useTags";
 import { useCategories } from "@/hooks/useCategories";
@@ -62,6 +63,8 @@ export function RecipeEditorPage() {
   const [showImageUrlInput, setShowImageUrlInput] = useState(false);
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pasteText, setPasteText] = useState("");
+  const [stepsPasteOpen, setStepsPasteOpen] = useState(false);
+  const [stepsPasteText, setStepsPasteText] = useState("");
 
   useEffect(() => {
     if (recipe && isEditing) {
@@ -206,6 +209,21 @@ export function RecipeEditorPage() {
         .filter((_, i) => i !== idx)
         .map((s, i) => ({ ...s, sortOrder: i })),
     }));
+  };
+
+  const handlePasteSteps = () => {
+    if (!stepsPasteText.trim()) return;
+    const parsed = parseStepsText(stepsPasteText, form.steps.length);
+    if (parsed.length === 0) return;
+    setForm((prev) => ({
+      ...prev,
+      steps: [...prev.steps, ...parsed].map((s, i) => ({
+        ...s,
+        sortOrder: i,
+      })),
+    }));
+    setStepsPasteText("");
+    setStepsPasteOpen(false);
   };
 
   // --- Tags ---
@@ -714,10 +732,38 @@ export function RecipeEditorPage() {
             </div>
           ))}
         </div>
-        <Button type="button" variant="ghost" size="sm" onClick={addStep}>
-          <Plus size={16} />
-          Add Step
-        </Button>
+        <div className="flex gap-2">
+          <Button type="button" variant="ghost" size="sm" onClick={addStep}>
+            <Plus size={16} />
+            Add Step
+          </Button>
+          <Button type="button" variant="ghost" size="sm" onClick={() => setStepsPasteOpen((v) => !v)}>
+            <ClipboardPaste size={16} />
+            Paste List
+          </Button>
+        </div>
+        {stepsPasteOpen && (
+          <div className="rounded-lg border border-stone-200 bg-stone-50 p-4 space-y-3">
+            <textarea
+              rows={8}
+              placeholder={"Paste steps here…\n\nSupports:\n• Plain text (one step per line)\n• HTML from recipe websites"}
+              value={stepsPasteText}
+              onChange={(e) => setStepsPasteText(e.target.value)}
+              className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm font-mono placeholder:text-stone-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+            />
+            <div className="flex items-center gap-2">
+              <Button type="button" size="sm" onClick={handlePasteSteps} disabled={!stepsPasteText.trim()}>
+                Parse & Add
+              </Button>
+              <Button type="button" variant="ghost" size="sm" onClick={() => { setStepsPasteOpen(false); setStepsPasteText(""); }}>
+                Cancel
+              </Button>
+              <span className="text-xs text-stone-400 ml-auto">
+                HTML from recipe sites and numbered lists are parsed automatically
+              </span>
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Submit bar (sticky on mobile) */}
