@@ -6,6 +6,7 @@ export interface Ingredient {
   sortOrder: number;
   masterIngredientId: string | null;
   note: string;
+  isSection: boolean;
 }
 
 export interface Step {

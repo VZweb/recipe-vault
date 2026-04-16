@@ -52,6 +52,7 @@ function docToRecipe(id: string, data: DocumentData): Recipe {
       nameSecondary: ing.nameSecondary ?? "",
       masterIngredientId: ing.masterIngredientId ?? null,
       note: (ing.note as string) ?? "",
+      isSection: (ing.isSection as boolean) ?? false,
     })),
     steps: data.steps ?? [],
     cookedCount: data.cookedCount ?? 0,

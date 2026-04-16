@@ -299,8 +299,8 @@ export function RecipeDetailPage() {
             </h2>
             {pantryItems.length > 0 && (
               <span className="text-xs text-stone-400">
-                {recipe.ingredients.filter((ing) => isInPantry(ing.name, ing.nameSecondary, ing.masterIngredientId)).length}
-                /{recipe.ingredients.length} in pantry
+                {recipe.ingredients.filter((ing) => !ing.isSection && isInPantry(ing.name, ing.nameSecondary, ing.masterIngredientId)).length}
+                /{recipe.ingredients.filter((ing) => !ing.isSection).length} in pantry
               </span>
             )}
           </div>
@@ -308,6 +308,15 @@ export function RecipeDetailPage() {
             {recipe.ingredients
               .sort((a, b) => a.sortOrder - b.sortOrder)
               .map((ing, i) => {
+                if (ing.isSection) {
+                  return (
+                    <li key={i} className="pt-3 first:pt-0">
+                      <h4 className="text-xs font-semibold uppercase tracking-wider text-stone-500">
+                        {ing.name}
+                      </h4>
+                    </li>
+                  );
+                }
                 const inPantry = isInPantry(ing.name, ing.nameSecondary, ing.masterIngredientId);
                 return (
                   <li

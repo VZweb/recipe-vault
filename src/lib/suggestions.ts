@@ -44,6 +44,7 @@ export function suggestRecipes(
     const missing: string[] = [];
 
     for (const ing of recipe.ingredients) {
+      if (ing.isSection) continue;
       if (ing.masterIngredientId && allMasterIds.has(ing.masterIngredientId)) {
         matched.push(ing.name);
         continue;
@@ -63,7 +64,7 @@ export function suggestRecipes(
       }
     }
 
-    const total = recipe.ingredients.length;
+    const total = recipe.ingredients.filter((i) => !i.isSection).length;
     return {
       recipe,
       matchedCount: matched.length,

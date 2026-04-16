@@ -109,7 +109,7 @@ function extractNoteFromHtml(htmlContent) {
   const root = parseHTML(htmlContent);
 
   const title =
-    root.querySelector(".heading")?.text?.trim() ||
+    root.querySelector(".note .title")?.text?.trim() ||
     root.querySelector("title")?.text?.trim() ||
     "";
 
@@ -134,7 +134,9 @@ function extractNoteFromHtml(htmlContent) {
     labels = chipEls.map((el) => el.text.trim()).filter(Boolean);
   }
 
-  return { title, lines, labels, annotations: [], createdAt: null, archived: false };
+  const isChecklist = !!(contentEl && contentEl.querySelectorAll("li .bullet").length > 0);
+
+  return { title, lines, labels, annotations: [], createdAt: null, archived: false, isChecklist };
 }
 
 // ---------------------------------------------------------------------------
@@ -161,6 +163,9 @@ const SECTION_HEADERS_STEPS = [
   "how to make",
   "εκτέλεση",
   "οδηγίες",
+  "μέθοδος",
+  "παρασκευή",
+  "βήματα",
 ];
 
 function isSectionHeader(line, headers) {
@@ -255,6 +260,7 @@ const PAREN_QTY_RE =
 
 function parseIngredientLine(raw) {
   const clean = raw.replace(/^[-•*]\s*/, "").trim();
+  const base = { note: "", isSection: false };
 
   // Priority 1: standard "2 cups flour" pattern
   const match = clean.match(QUANTITY_RE);
@@ -264,7 +270,7 @@ function parseIngredientLine(raw) {
     const unit = normalizeUnit(rawUnit);
     const name = cleanIngredientName(clean.slice(match[0].length));
     const quantity = parseQuantity(qtyStr);
-    return { name: name || clean, quantity, unit };
+    return { ...base, name: name || clean, quantity, unit };
   }
 
   // Priority 2: parenthetical quantity "(50g) scallions"
@@ -273,7 +279,7 @@ function parseIngredientLine(raw) {
     const quantity = parseQuantity(parenMatch[1]);
     const unit = parenMatch[2] ? normalizeUnit(parenMatch[2]) : "";
     const name = cleanIngredientName(clean.slice(parenMatch[0].length));
-    return { name: name || clean, quantity, unit };
+    return { ...base, name: name || clean, quantity, unit };
   }
 
   // Priority 3: Greek unit prefix without a digit ("κ.σ. βασιλικό")
@@ -282,21 +288,27 @@ function parseIngredientLine(raw) {
     const rawUnit = unitMatch[1].replace(/\.$/, "").trim();
     const unit = normalizeUnit(rawUnit);
     const name = cleanIngredientName(clean.slice(unitMatch[0].length));
-    return { name: name || clean, quantity: null, unit };
+    return { ...base, name: name || clean, quantity: null, unit };
   }
 
-  return { name: cleanIngredientName(clean), quantity: null, unit: "" };
+  return { ...base, name: cleanIngredientName(clean), quantity: null, unit: "" };
 }
 
 const VIDEO_URL_RE = /(?:youtube\.com|youtu\.be|vimeo\.com|tiktok\.com)/i;
+
+// Dietary / category markers that sometimes appear as a last checklist item
+const DIETARY_TAG_RE = /^(?:νηστ[ιί]σιμ[οη]|vegan|vegetarian|χορτοφαγικ[οόή])(?:\s*\/\s*(?:νηστ[ιί]σιμ[οη]|vegan|vegetarian|χορτοφαγικ[οόή]))*$/i;
 
 function isVideoUrl(url) {
   return VIDEO_URL_RE.test(url);
 }
 
 // Greek sub-section headers like "Για το κότσι", "Για τη σάλτσα", "Για τη γέμιση"
-// These are ingredient group labels — skip them (app has no grouping support)
 const SUB_SECTION_RE = /^για\s+τ[οηα]\w?\s+/i;
+
+// Greek instruction pattern: lines starting with first-person plural verbs
+// e.g. Προσθέτουμε, Ψιλοκόβουμε, Σερβίρουμε, Ανακατεύουμε, Ρίχνουμε
+const GREEK_INSTRUCTION_RE = /^[Α-Ωα-ωάέήίόύώϊϋ]+ουμε\s/i;
 
 // Cook/prep time in title: (240'), (30 λεπτά), (45'), (1h30), (1.5h)
 function extractTimeFromTitle(title) {
@@ -321,6 +333,7 @@ function extractTimeFromTitle(title) {
 function parseRecipeContent(title, lines, annotations, { isChecklist = false } = {}) {
   const ingredients = [];
   const steps = [];
+  const extraTags = [];
   let description = "";
   let servings = null;
   let sourceUrl = "";
@@ -329,24 +342,25 @@ function parseRecipeContent(title, lines, annotations, { isChecklist = false } =
   // Extract cook time from title pattern like "(240')"
   const { cleanTitle, cookTimeMin } = extractTimeFromTitle(title);
 
-  // Pull URL and description from web-link annotations first
-  if (annotations.length > 0) {
-    const ann = annotations[0];
-    if (ann.url) {
-      if (isVideoUrl(ann.url)) {
-        videoUrl = ann.url;
-      } else {
-        sourceUrl = ann.url;
-      }
+  // Pull URLs and description from web-link annotations
+  // Prefer the most specific URL (longest path) and the longest description
+  for (const ann of annotations) {
+    if (!ann.url) continue;
+    if (isVideoUrl(ann.url)) {
+      if (!videoUrl || ann.url.length > videoUrl.length) videoUrl = ann.url;
+    } else {
+      if (!sourceUrl || ann.url.length > sourceUrl.length) sourceUrl = ann.url;
     }
-    if (ann.description) description = ann.description;
+    if (ann.description && ann.description.length > description.length) {
+      description = ann.description;
+    }
   }
 
   // Checklist notes are typically ingredient/shopping lists — default to ingredients mode
   let mode = isChecklist ? "ingredients" : "auto";
 
   for (const line of lines) {
-    // Detect URLs
+    // Detect URLs (including corrupted ones with Greek chars replacing slashes)
     const urlMatch = line.match(/https?:\/\/\S+/);
     if (urlMatch) {
       const url = urlMatch[0];
@@ -356,8 +370,14 @@ function parseRecipeContent(title, lines, annotations, { isChecklist = false } =
         sourceUrl = url;
       }
     }
-    // Skip lines that are purely a URL (already captured above)
-    if (urlMatch && line.trim() === urlMatch[0]) continue;
+    // Skip lines that are purely a URL or start with http (URL with broken spaces/chars)
+    if (/^\s*https?:/i.test(line)) continue;
+
+    // Dietary / category markers → collect as extra tags
+    if (DIETARY_TAG_RE.test(line.trim())) {
+      extraTags.push(line.trim());
+      continue;
+    }
 
     // Detect servings
     const servingsMatch = line.match(
@@ -377,6 +397,11 @@ function parseRecipeContent(title, lines, annotations, { isChecklist = false } =
     // Section header detection (explicit ingredient/step headers)
     if (isSectionHeader(line, SECTION_HEADERS_INGREDIENTS)) {
       mode = "ingredients";
+      // Extract servings from headers like "Υλικά (Για 6-8 άτομα)" or "Υλικά (για 4 άτομα)"
+      const servingsInHeader = line.match(/\((?:για\s+)?(\d+)(?:\s*-\s*\d+)?\s*(?:άτομα|μερίδ|servings?|portions?)\)/i);
+      if (servingsInHeader && !servings) {
+        servings = Number(servingsInHeader[1]) || null;
+      }
       continue;
     }
     if (isSectionHeader(line, SECTION_HEADERS_STEPS)) {
@@ -384,21 +409,48 @@ function parseRecipeContent(title, lines, annotations, { isChecklist = false } =
       continue;
     }
 
-    // Greek sub-section headers ("Για το κότσι", "Για τη σάλτσα") — skip
+    // Greek sub-section headers ("Για το κότσι", "Για τη σάλτσα") → section item
     if (SUB_SECTION_RE.test(line.trim())) {
+      ingredients.push({
+        name: line.trim(),
+        quantity: null,
+        unit: "",
+        sortOrder: ingredients.length,
+        note: "",
+        isSection: true,
+      });
       continue;
     }
+
+    // Skip separator lines (e.g. "----------Tags-------------", "---")
+    if (/^-{3,}/.test(line.trim())) continue;
 
     // Mode-based classification
     if (mode === "ingredients") {
       if (line.trim()) {
-        const parsed = parseIngredientLine(line);
-        ingredients.push({ ...parsed, sortOrder: ingredients.length });
+        // Long lines or lines starting with Greek verbs are instructions, not ingredients
+        const isLikelyInstruction =
+          (line.length > 100 || GREEK_INSTRUCTION_RE.test(line.trim())) &&
+          !QUANTITY_RE.test(line) &&
+          !looksLikeIngredient(line);
+        if (isLikelyInstruction) {
+          steps.push({ instruction: line.trim(), imageUrl: null, sortOrder: steps.length });
+        } else {
+          const parsed = parseIngredientLine(line);
+          ingredients.push({ ...parsed, sortOrder: ingredients.length });
+        }
       }
     } else if (mode === "steps") {
       if (line.trim()) {
-        const instruction = line.replace(/^\d+[.)]\s*/, "").trim();
-        steps.push({ instruction, imageUrl: null, sortOrder: steps.length });
+        // If a line clearly looks like an ingredient while in steps mode,
+        // add it to ingredients (handles ingredients appended after steps)
+        if (looksLikeIngredient(line) && !GREEK_INSTRUCTION_RE.test(line.trim())) {
+          const parsed = parseIngredientLine(line);
+          ingredients.push({ ...parsed, sortOrder: ingredients.length });
+        } else {
+          const instruction = line.replace(/^\d+[.)]\s*/, "").trim();
+          steps.push({ instruction, imageUrl: null, sortOrder: steps.length });
+        }
       }
     } else {
       if (looksLikeIngredient(line)) {
@@ -432,7 +484,7 @@ function parseRecipeContent(title, lines, annotations, { isChecklist = false } =
     sourceUrl,
     videoUrl,
     imageUrls: [],
-    tags: [],
+    tags: extraTags,
     ingredients,
     steps,
   };
@@ -509,32 +561,37 @@ for (const file of jsonFiles) {
     { isChecklist: note.isChecklist }
   );
 
-  recipe.tags = note.labels;
+  recipe.tags = [...note.labels, ...recipe.tags];
   recipes.push(recipe);
 }
 
-// Process HTML files (fallback for older exports)
-for (const file of htmlFiles) {
-  const html = fs.readFileSync(path.join(keepDir, file), "utf-8");
-  const note = extractNoteFromHtml(html);
+// Process HTML files only when no JSON files exist (HTML is a fallback for older exports)
+if (jsonFiles.length === 0) {
+  for (const file of htmlFiles) {
+    const html = fs.readFileSync(path.join(keepDir, file), "utf-8");
+    const note = extractNoteFromHtml(html);
 
-  if (!matchesLabelFilter(note.labels)) {
-    skippedByLabel++;
-    continue;
+    if (!matchesLabelFilter(note.labels)) {
+      skippedByLabel++;
+      continue;
+    }
+
+    if (note.lines.length === 0 && !note.title) {
+      skippedEmpty++;
+      continue;
+    }
+
+    const recipe = parseRecipeContent(
+      note.title || file.replace(".html", ""),
+      note.lines,
+      note.annotations,
+      { isChecklist: note.isChecklist }
+    );
+    recipe.tags = [...note.labels, ...recipe.tags];
+    recipes.push(recipe);
   }
-
-  if (note.lines.length === 0 && !note.title) {
-    skippedEmpty++;
-    continue;
-  }
-
-  const recipe = parseRecipeContent(
-    note.title || file.replace(".html", ""),
-    note.lines,
-    note.annotations
-  );
-  recipe.tags = note.labels;
-  recipes.push(recipe);
+} else {
+  console.log("  Skipping HTML files (JSON files available — they are richer).");
 }
 
 fs.writeFileSync(outputPath, JSON.stringify(recipes, null, 2), "utf-8");

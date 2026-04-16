@@ -208,6 +208,7 @@ for (let i = 0; i < recipes.length; i++) {
   let recipeMatched = 0;
 
   for (const ing of recipe.ingredients) {
+    if (ing.isSection) continue;
     totalIngredients++;
 
     // Try matching on name
@@ -216,12 +217,22 @@ for (let i = 0; i < recipes.length; i++) {
     if (result) {
       ing.masterIngredientId = result.match.id;
       ing.nameSecondary = result.match.nameGr || "";
+
+      // Extract qualifier text as note (e.g. "πράσα, χοντροκομμένα" → note: "χοντροκομμένα")
+      if (!ing.note) {
+        const commaIdx = ing.name.indexOf(",");
+        if (commaIdx !== -1) {
+          ing.note = ing.name.slice(commaIdx + 1).trim();
+        }
+      }
+
       recipeMatched++;
       totalMatched++;
 
       if (dryRun) {
+        const noteInfo = ing.note ? ` [note: "${ing.note}"]` : "";
         console.log(
-          `  ✓ [${result.type}] "${ing.name}" → ${result.match.name} (${result.match.nameGr || "—"})`
+          `  ✓ [${result.type}] "${ing.name}" → ${result.match.name} (${result.match.nameGr || "—"})${noteInfo}`
         );
       }
     } else {

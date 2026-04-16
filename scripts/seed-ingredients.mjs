@@ -187,6 +187,7 @@ const rawExamples = new Map();  // cleaned name → original raw name (for refer
 
 for (const recipe of recipes) {
   for (const ing of recipe.ingredients || []) {
+    if (ing.isSection) continue;
     const raw = (ing.name || "").trim();
     if (!raw) continue;
 

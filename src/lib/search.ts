@@ -27,6 +27,7 @@ export function buildSearchIndex(
       .filter((n): n is string => !!n),
     categoryName: (r.categoryId && catMap.get(r.categoryId)) || "",
     ingredientNames: r.ingredients
+      .filter((i) => !i.isSection)
       .flatMap((i) => {
         const names = [i.name];
         if (i.nameSecondary) names.push(i.nameSecondary);

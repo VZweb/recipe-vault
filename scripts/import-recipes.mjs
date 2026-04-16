@@ -173,6 +173,8 @@ for (let i = 0; i < recipes.length; i++) {
         unit: ing.unit || "",
         sortOrder: ing.sortOrder ?? idx,
         masterIngredientId: ing.masterIngredientId ?? null,
+        note: ing.note || "",
+        isSection: ing.isSection ?? false,
       })),
       steps: (r.steps || []).map((s, idx) => ({
         instruction: typeof s === "string" ? s : s.instruction || "",
