@@ -3,11 +3,10 @@ import {
   BookOpen,
   ChefHat,
   Egg,
-  FolderOpen,
   Home,
+  Layers,
   Package,
   Search,
-  Tags,
 } from "lucide-react";
 
 const navItems = [
@@ -16,8 +15,7 @@ const navItems = [
   { to: "/suggestions", icon: ChefHat, label: "Cook" },
   { to: "/pantry", icon: Package, label: "Pantry" },
   { to: "/ingredients", icon: Egg, label: "Ingredients" },
-  { to: "/categories", icon: FolderOpen, label: "Categories" },
-  { to: "/tags", icon: Tags, label: "Tags" },
+  { to: "/organize", icon: Layers, label: "Organize" },
 ];
 
 export function AppLayout() {

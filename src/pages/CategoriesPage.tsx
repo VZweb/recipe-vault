@@ -171,7 +171,7 @@ function CategoryRow({
   );
 }
 
-export function CategoriesPage() {
+export function CategoriesPage({ embedded = false }: { embedded?: boolean } = {}) {
   const { categories, add, edit, remove } = useCategories();
   const [newName, setNewName] = useState("");
   const [newDescription, setNewDescription] = useState("");
@@ -195,7 +195,7 @@ export function CategoriesPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-stone-800">Categories</h1>
+      {!embedded && <h1 className="text-2xl font-bold text-stone-800">Categories</h1>}
 
       {/* Add form */}
       <form

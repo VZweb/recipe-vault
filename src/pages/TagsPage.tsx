@@ -8,7 +8,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { TAG_COLORS } from "@/types/tag";
 
-export function TagsPage() {
+export function TagsPage({ embedded = false }: { embedded?: boolean } = {}) {
   const { tags, add, remove } = useTags();
   const [newName, setNewName] = useState("");
   const [newColor, setNewColor] = useState<string>(TAG_COLORS[0]);
@@ -30,7 +30,7 @@ export function TagsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-stone-800">Tags</h1>
+      {!embedded && <h1 className="text-2xl font-bold text-stone-800">Tags</h1>}
 
       {/* Add form */}
       <form
