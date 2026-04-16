@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Camera,
   ChevronDown,
@@ -11,9 +11,11 @@ import {
   Package,
   Pencil,
   Plus,
+  Search,
   Trash2,
   X,
 } from "lucide-react";
+import { normalizeText } from "@/lib/normalize";
 import {
   fetchPantryItems,
   addPantryItem,
@@ -62,6 +64,7 @@ export function PantryPage() {
   >(null);
   const [newNote, setNewNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const { ingredients: masterIngredients } = useIngredients();
 
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(
@@ -319,9 +322,22 @@ export function PantryPage() {
     setCollapsedCategories(new Set());
   };
 
+  const filteredItems = useMemo(() => {
+    if (!searchQuery.trim()) return items;
+    const q = normalizeText(searchQuery);
+    return items.filter((item) => {
+      const targets = [
+        normalizeText(item.name),
+        normalizeText(item.nameSecondary ?? ""),
+        normalizeText(item.note ?? ""),
+      ].filter(Boolean);
+      return targets.some((t) => t.includes(q));
+    });
+  }, [items, searchQuery]);
+
   const grouped = PANTRY_CATEGORIES.reduce(
     (acc, cat) => {
-      const catItems = items.filter((i) => i.category === cat);
+      const catItems = filteredItems.filter((i) => i.category === cat);
       if (catItems.length > 0) acc[cat] = catItems;
       return acc;
     },
@@ -547,6 +563,28 @@ export function PantryPage() {
           </div>
         )}
       </form>
+
+      {/* Search */}
+      {items.length > 0 && (
+        <div className="relative">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+          <input
+            type="text"
+            placeholder="Search pantry…"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full rounded-lg border border-stone-200 bg-white py-2 pl-9 pr-8 text-sm text-stone-800 placeholder:text-stone-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-colors"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 transition-colors"
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Grouped list */}
       {categoryKeys.length > 0 ? (
@@ -945,6 +983,12 @@ export function PantryPage() {
             );
           })}
         </div>
+      ) : searchQuery.trim() ? (
+        <EmptyState
+          icon={<Search size={48} />}
+          title="No matches"
+          description={`No pantry items match "${searchQuery}".`}
+        />
       ) : (
         <EmptyState
           icon={<Package size={48} />}

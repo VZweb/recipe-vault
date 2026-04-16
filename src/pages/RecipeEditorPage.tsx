@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, ChevronDown, ChevronUp, ImagePlus, LayoutList, Link, Link2, MessageSquare, Plus, Trash2, X } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronUp, ClipboardPaste, ImagePlus, LayoutList, Link, Link2, MessageSquare, Plus, Trash2, X } from "lucide-react";
+import { parseIngredientText } from "@/lib/parseIngredients";
 import { useRecipe, useRecipeMutations } from "@/hooks/useRecipes";
 import { useTags } from "@/hooks/useTags";
 import { useCategories } from "@/hooks/useCategories";
@@ -59,6 +60,8 @@ export function RecipeEditorPage() {
   const [previewImages, setPreviewImages] = useState<string[]>([]);
   const [imageUrlInput, setImageUrlInput] = useState("");
   const [showImageUrlInput, setShowImageUrlInput] = useState(false);
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const [pasteText, setPasteText] = useState("");
 
   useEffect(() => {
     if (recipe && isEditing) {
@@ -121,6 +124,30 @@ export function RecipeEditorPage() {
         emptySection(prev.ingredients.length),
       ],
     }));
+  };
+
+  const handlePasteIngredients = () => {
+    if (!pasteText.trim()) return;
+    const parsed = parseIngredientText(
+      pasteText,
+      masterIngredients,
+      form.ingredients.length,
+    );
+    if (parsed.length === 0) return;
+    setForm((prev) => ({
+      ...prev,
+      ingredients: [...prev.ingredients, ...parsed].map((ing, i) => ({
+        ...ing,
+        sortOrder: i,
+      })),
+    }));
+    const newNotes = new Set(noteOpenSet);
+    parsed.forEach((ing, i) => {
+      if (ing.note) newNotes.add(form.ingredients.length + i);
+    });
+    setNoteOpenSet(newNotes);
+    setPasteText("");
+    setPasteOpen(false);
   };
 
   const removeIngredient = (idx: number) => {
@@ -628,7 +655,33 @@ export function RecipeEditorPage() {
             <LayoutList size={16} />
             Add Section
           </Button>
+          <Button type="button" variant="ghost" size="sm" onClick={() => setPasteOpen((v) => !v)}>
+            <ClipboardPaste size={16} />
+            Paste List
+          </Button>
         </div>
+        {pasteOpen && (
+          <div className="rounded-lg border border-stone-200 bg-stone-50 p-4 space-y-3">
+            <textarea
+              rows={8}
+              placeholder={"Paste ingredients here, one per line…\n\nExample:\n2 cups flour\n1 tsp salt\n3 eggs\n\nFor the sauce:\n200g tomato paste"}
+              value={pasteText}
+              onChange={(e) => setPasteText(e.target.value)}
+              className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm font-mono placeholder:text-stone-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+            />
+            <div className="flex items-center gap-2">
+              <Button type="button" size="sm" onClick={handlePasteIngredients} disabled={!pasteText.trim()}>
+                Parse & Add
+              </Button>
+              <Button type="button" variant="ghost" size="sm" onClick={() => { setPasteOpen(false); setPasteText(""); }}>
+                Cancel
+              </Button>
+              <span className="text-xs text-stone-400 ml-auto">
+                Quantities, units & catalog matches are detected automatically
+              </span>
+            </div>
+          </div>
+        )}
       </section>
 
       {/* Steps */}
