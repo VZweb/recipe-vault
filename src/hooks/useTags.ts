@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { fetchTags, createTag, deleteTag } from "@/lib/firestore";
+import { fetchTags, createTag, updateTag, deleteTag } from "@/lib/firestore";
 import type { Tag } from "@/types/tag";
 
 export function useTags() {
@@ -28,10 +28,19 @@ export function useTags() {
     return id;
   };
 
+  const update = async (id: string, fields: { name?: string; color?: string }) => {
+    await updateTag(id, fields);
+    setTags((prev) =>
+      prev
+        .map((t) => (t.id === id ? { ...t, ...fields } : t))
+        .sort((a, b) => a.name.localeCompare(b.name))
+    );
+  };
+
   const remove = async (id: string) => {
     await deleteTag(id);
     setTags((prev) => prev.filter((t) => t.id !== id));
   };
 
-  return { tags, loading, add, remove, refresh: load };
+  return { tags, loading, add, update, remove, refresh: load };
 }

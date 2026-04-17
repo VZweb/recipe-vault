@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Tags, Trash2 } from "lucide-react";
+import { Check, Pencil, Plus, Tags, Trash2, X } from "lucide-react";
 import { useTags } from "@/hooks/useTags";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -9,10 +9,13 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { TAG_COLORS } from "@/types/tag";
 
 export function TagsPage({ embedded = false }: { embedded?: boolean } = {}) {
-  const { tags, add, remove } = useTags();
+  const { tags, add, update, remove } = useTags();
   const [newName, setNewName] = useState("");
   const [newColor, setNewColor] = useState<string>(TAG_COLORS[0]);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editColor, setEditColor] = useState("");
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,6 +29,28 @@ export function TagsPage({ embedded = false }: { embedded?: boolean } = {}) {
     if (!deleteId) return;
     await remove(deleteId);
     setDeleteId(null);
+  };
+
+  const startEdit = (tag: { id: string; name: string; color: string }) => {
+    setEditId(tag.id);
+    setEditName(tag.name);
+    setEditColor(tag.color);
+  };
+
+  const cancelEdit = () => {
+    setEditId(null);
+    setEditName("");
+    setEditColor("");
+  };
+
+  const handleUpdate = async () => {
+    if (!editId || !editName.trim()) return;
+    const original = tags.find((t) => t.id === editId);
+    const fields: { name?: string; color?: string } = {};
+    if (original && editName.trim() !== original.name) fields.name = editName.trim();
+    if (original && editColor !== original.color) fields.color = editColor;
+    if (Object.keys(fields).length > 0) await update(editId, fields);
+    cancelEdit();
   };
 
   return (
@@ -76,20 +101,81 @@ export function TagsPage({ embedded = false }: { embedded?: boolean } = {}) {
               key={tag.id}
               className="flex items-center justify-between rounded-lg border border-stone-200 bg-white px-4 py-3"
             >
-              <div className="flex items-center gap-3">
-                <div
-                  className="h-3 w-3 rounded-full"
-                  style={{ backgroundColor: tag.color }}
-                />
-                <TagChip name={tag.name} color={tag.color} />
-              </div>
-              <button
-                onClick={() => setDeleteId(tag.id)}
-                className="p-1 text-stone-400 hover:text-red-500 transition-colors"
-                aria-label={`Delete ${tag.name}`}
-              >
-                <Trash2 size={16} />
-              </button>
+              {editId === tag.id ? (
+                <>
+                  <div className="flex flex-1 items-center gap-3">
+                    <Input
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      className="max-w-xs"
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") void handleUpdate();
+                        if (e.key === "Escape") cancelEdit();
+                      }}
+                    />
+                    <div className="flex gap-1.5">
+                      {TAG_COLORS.map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => setEditColor(c)}
+                          className={`h-6 w-6 rounded-full transition-all ${
+                            editColor === c
+                              ? "ring-2 ring-offset-1 scale-110"
+                              : "hover:scale-105"
+                          }`}
+                          style={{ backgroundColor: c, ["--tw-ring-color" as string]: c }}
+                          aria-label={`Select color ${c}`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 ml-2">
+                    <button
+                      onClick={() => void handleUpdate()}
+                      disabled={!editName.trim()}
+                      className="p-1 text-green-600 hover:text-green-700 transition-colors disabled:opacity-40"
+                      aria-label="Save"
+                    >
+                      <Check size={16} />
+                    </button>
+                    <button
+                      onClick={cancelEdit}
+                      className="p-1 text-stone-400 hover:text-stone-600 transition-colors"
+                      aria-label="Cancel"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="h-3 w-3 rounded-full"
+                      style={{ backgroundColor: tag.color }}
+                    />
+                    <TagChip name={tag.name} color={tag.color} />
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => startEdit(tag)}
+                      className="p-1 text-stone-400 hover:text-stone-600 transition-colors"
+                      aria-label={`Edit ${tag.name}`}
+                    >
+                      <Pencil size={16} />
+                    </button>
+                    <button
+                      onClick={() => setDeleteId(tag.id)}
+                      className="p-1 text-stone-400 hover:text-red-500 transition-colors"
+                      aria-label={`Delete ${tag.name}`}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           ))}
         </div>

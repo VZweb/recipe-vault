@@ -194,6 +194,13 @@ export async function createTag(
   return docRef.id;
 }
 
+export async function updateTag(
+  id: string,
+  fields: { name?: string; color?: string }
+): Promise<void> {
+  await updateDoc(doc(db, "tags", id), fields);
+}
+
 export async function deleteTag(id: string): Promise<void> {
   const recipesWithTag = await getDocs(
     query(recipesCol, where("tags", "array-contains", id))
