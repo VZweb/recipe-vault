@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ChefHat, Clock, Info, Percent, Users } from "lucide-react";
+import { ChefHat, Clock, Info, Link2, Percent, Users } from "lucide-react";
 import { useRecipes } from "@/hooks/useRecipes";
 import { useTags } from "@/hooks/useTags";
 import { useIngredients } from "@/hooks/useIngredients";
@@ -109,6 +109,16 @@ export function SuggestionsPage() {
     return map;
   }, [extraIngredients, suggestions]);
 
+  const pantryMasterIds = useMemo(
+    () => new Set(pantryItems.map((p) => p.masterIngredientId).filter(Boolean)),
+    [pantryItems]
+  );
+
+  const pantryNames = useMemo(
+    () => new Set(pantryItems.map((p) => p.normalizedName)),
+    [pantryItems]
+  );
+
   const handleAddExtra = (e: React.FormEvent) => {
     e.preventDefault();
     if (!pendingExtra.name.trim()) return;
@@ -168,11 +178,12 @@ export function SuggestionsPage() {
             <span
               key={i}
               className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                ing.masterIngredientId
+                (ing.masterIngredientId ? pantryMasterIds.has(ing.masterIngredientId) : pantryNames.has(ing.name.toLowerCase()))
                   ? "bg-green-50 text-green-700"
                   : "bg-blue-950/10 text-blue-950"
               }`}
             >
+              {ing.masterIngredientId && <Link2 size={12} className="shrink-0" />}
               {ing.name}
               <button
                 onClick={() =>
