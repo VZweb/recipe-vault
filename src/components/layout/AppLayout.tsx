@@ -1,4 +1,5 @@
-import { Outlet, NavLink } from "react-router-dom";
+import { useEffect } from "react";
+import { Outlet, NavLink, useLocation } from "react-router-dom";
 import {
   BookOpen,
   ChefHat,
@@ -8,6 +9,14 @@ import {
   Package,
   Search,
 } from "lucide-react";
+
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+  return null;
+}
 
 const navItems = [
   { to: "/", icon: Home, label: "Home" },
@@ -21,6 +30,7 @@ const navItems = [
 export function AppLayout() {
   return (
     <div className="min-h-screen flex flex-col">
+      <ScrollToTop />
       {/* Top header */}
       <header className="sticky top-0 z-30 border-b border-stone-200 bg-white/80 backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">

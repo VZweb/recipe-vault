@@ -285,7 +285,7 @@ function SuggestionCard({
       {/* Content */}
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
-          <h3 className="font-semibold text-stone-900 truncate">
+          <h3 className="font-semibold text-stone-900 line-clamp-2 sm:truncate">
             {s.recipe.title}
           </h3>
           <span
