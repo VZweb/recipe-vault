@@ -268,7 +268,7 @@ export function RecipeDetailPage() {
                 href={recipe.sourceUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-sm text-brand-600 hover:text-brand-700"
+                className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700"
               >
                 <ExternalLink size={14} />
                 View original source

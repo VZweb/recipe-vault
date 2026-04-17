@@ -54,7 +54,7 @@ export function suggestRecipes(
       if (ing.nameSecondary?.trim())
         candidates.push(normalizeText(ing.nameSecondary));
       const isAvailable = Array.from(available).some((a) =>
-        candidates.some((c) => c.includes(a) || a.includes(c))
+        candidates.some((c) => c === a)
       );
 
       if (isAvailable) {

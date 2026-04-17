@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ChefHat, Clock, Percent, Users } from "lucide-react";
+import { ChefHat, Clock, Info, Percent, Users } from "lucide-react";
 import { useRecipes } from "@/hooks/useRecipes";
 import { useTags } from "@/hooks/useTags";
 import { useIngredients } from "@/hooks/useIngredients";
 import { fetchPantryItems } from "@/lib/firestore";
 import { suggestRecipes, type SuggestionResult } from "@/lib/suggestions";
+import { normalizeText } from "@/lib/normalize";
 import { Button } from "@/components/ui/Button";
 import { TagChip } from "@/components/ui/TagChip";
 import { Spinner } from "@/components/ui/Spinner";
@@ -86,6 +87,58 @@ export function SuggestionsPage() {
     () => suggestRecipes(recipes, allAvailable, combinedPantry),
     [recipes, allAvailable, combinedPantry]
   );
+
+  const unmatchedExtras = useMemo(() => {
+    if (extraIngredients.length === 0) return [];
+    const matchedNames = new Set(
+      suggestions.flatMap((s) =>
+        s.matchedIngredients.map((n) => n.toLowerCase())
+      )
+    );
+    return extraIngredients.filter(
+      (e) => !matchedNames.has(e.name.toLowerCase())
+    );
+  }, [extraIngredients, suggestions]);
+
+  const matchedExtrasPerRecipe = useMemo(() => {
+    if (extraIngredients.length === 0) return new Map<string, string[]>();
+    const extraMasterIds = new Set(
+      extraIngredients.map((e) => e.masterIngredientId).filter(Boolean)
+    );
+    const extraNormalized = extraIngredients.map((e) => ({
+      name: e.name,
+      norm: normalizeText(e.name),
+      normSecondary: e.nameSecondary ? normalizeText(e.nameSecondary) : null,
+    }));
+
+    const map = new Map<string, string[]>();
+    for (const s of suggestions) {
+      const hits: string[] = [];
+      for (const ing of s.recipe.ingredients) {
+        if (ing.isSection) continue;
+        if (!s.matchedIngredients.includes(ing.name)) continue;
+        if (ing.masterIngredientId && extraMasterIds.has(ing.masterIngredientId)) {
+          const extra = extraIngredients.find(
+            (e) => e.masterIngredientId === ing.masterIngredientId
+          );
+          if (extra && !hits.includes(extra.name)) hits.push(extra.name);
+          continue;
+        }
+        const ingNorm = normalizeText(ing.name);
+        const ingNormSec = ing.nameSecondary ? normalizeText(ing.nameSecondary) : null;
+        for (const ex of extraNormalized) {
+          const candidates = [ingNorm, ...(ingNormSec ? [ingNormSec] : [])];
+          const extraCandidates = [ex.norm, ...(ex.normSecondary ? [ex.normSecondary] : [])];
+          const isMatch = candidates.some((c) =>
+            extraCandidates.some((ec) => c === ec)
+          );
+          if (isMatch && !hits.includes(ex.name)) hits.push(ex.name);
+        }
+      }
+      if (hits.length > 0) map.set(s.recipe.id, hits);
+    }
+    return map;
+  }, [extraIngredients, suggestions]);
 
   const handleAddExtra = (e: React.FormEvent) => {
     e.preventDefault();
@@ -171,8 +224,25 @@ export function SuggestionsPage() {
         </div>
       ) : suggestions.length > 0 ? (
         <div className="space-y-4">
+          {unmatchedExtras.length > 0 && (
+            <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              <Info size={18} className="mt-0.5 flex-shrink-0 text-amber-500" />
+              <p>
+                No recipes found for{" "}
+                <span className="font-semibold">
+                  {unmatchedExtras.map((e) => e.name).join(", ")}
+                </span>
+                . Showing results based on your other ingredients.
+              </p>
+            </div>
+          )}
           {suggestions.map((s) => (
-            <SuggestionCard key={s.recipe.id} suggestion={s} tags={tags} />
+            <SuggestionCard
+              key={s.recipe.id}
+              suggestion={s}
+              tags={tags}
+              matchedExtras={matchedExtrasPerRecipe.get(s.recipe.id) ?? []}
+            />
           ))}
         </div>
       ) : recipes.length === 0 ? (
@@ -185,6 +255,12 @@ export function SuggestionsPage() {
               <Button>Add Recipe</Button>
             </Link>
           }
+        />
+      ) : extraIngredients.length > 0 ? (
+        <EmptyState
+          icon={<ChefHat size={48} />}
+          title="No recipes match your ingredients"
+          description="None of your recipes can be made with the ingredients you selected. Try adding different ingredients or broaden your pantry."
         />
       ) : (
         <EmptyState
@@ -200,18 +276,25 @@ export function SuggestionsPage() {
 function SuggestionCard({
   suggestion: s,
   tags: allTags,
+  matchedExtras,
 }: {
   suggestion: SuggestionResult;
   tags: { id: string; name: string; color: string }[];
+  matchedExtras: string[];
 }) {
   const recipeTags = allTags.filter((t) => s.recipe.tags.includes(t.id));
   const totalTime =
     (s.recipe.prepTimeMin ?? 0) + (s.recipe.cookTimeMin ?? 0) || null;
+  const highlighted = matchedExtras.length > 0;
 
   return (
     <Link
       to={`/recipes/${s.recipe.id}`}
-      className="flex gap-4 rounded-xl border border-stone-200 bg-white p-4 shadow-sm hover:shadow-md transition-shadow"
+      className={`flex gap-4 rounded-xl border p-4 shadow-sm hover:shadow-md transition-shadow ${
+        highlighted
+          ? "border-brand-300 bg-brand-50/40 ring-1 ring-brand-200"
+          : "border-stone-200 bg-white"
+      }`}
     >
       {/* Image */}
       <div className="h-24 w-24 flex-shrink-0 overflow-hidden rounded-lg bg-stone-100">
@@ -257,6 +340,12 @@ function SuggestionCard({
         {s.missingIngredients.length > 0 && (
           <p className="mt-1 text-xs text-red-500">
             Missing: {s.missingIngredients.join(", ")}
+          </p>
+        )}
+
+        {matchedExtras.length > 0 && (
+          <p className="mt-1 text-xs font-medium text-brand-600">
+            Uses your added: {matchedExtras.join(", ")}
           </p>
         )}
 
