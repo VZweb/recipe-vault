@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Camera,
+  Check,
   ChevronDown,
   ChevronRight,
   ChevronsDownUp,
   ChevronsUpDown,
+  ClipboardCopy,
   ImagePlus,
   Link,
   Link2,
@@ -77,6 +79,7 @@ export function PantryPage() {
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editState, setEditState] = useState<EditState | null>(null);
   const [saving, setSaving] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -342,6 +345,54 @@ export function PantryPage() {
 
   const expandAll = () => {
     setCollapsedCategories(new Set());
+  };
+
+  const buildRecipePrompt = useCallback(() => {
+    const staples = items.filter((i) => i.isStaple);
+    const regular = items.filter((i) => !i.isStaple);
+
+    const formatItem = (item: PantryItem) => {
+      let s = item.name;
+      if (item.quantity != null || item.unit) {
+        const parts = [item.quantity?.toString(), item.unit].filter(Boolean).join(" ");
+        s += ` (${parts})`;
+      }
+      return s;
+    };
+
+    const byCategory = PANTRY_CATEGORIES.reduce((acc, cat) => {
+      const catItems = regular.filter((i) => i.category === cat);
+      if (catItems.length > 0) acc[cat] = catItems;
+      return acc;
+    }, {} as Record<string, PantryItem[]>);
+
+    const lines: string[] = [
+      "I have the following ingredients in my pantry:",
+      "",
+    ];
+
+    for (const [cat, catItems] of Object.entries(byCategory)) {
+      lines.push(`${cat}: ${catItems.map(formatItem).join(", ")}`);
+    }
+
+    if (staples.length > 0) {
+      lines.push("");
+      lines.push(
+        `Staples (always available): ${staples.map(formatItem).join(", ")}`
+      );
+    }
+
+    lines.push("");
+    lines.push("Suggest 1 recipe I can make with these ingredients.");
+
+    return lines.join("\n");
+  }, [items]);
+
+  const handleCopyPrompt = async () => {
+    const prompt = buildRecipePrompt();
+    await navigator.clipboard.writeText(prompt);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const aliasMap = useMemo(() => {
@@ -700,8 +751,25 @@ export function PantryPage() {
       {/* Grouped list */}
       {categoryKeys.length > 0 ? (
         <div className="space-y-4">
-          {/* Expand / Collapse all */}
-          <div className="flex justify-end">
+          {/* Actions bar */}
+          <div className="flex items-center justify-between">
+            <button
+              onClick={handleCopyPrompt}
+              className="flex items-center gap-1.5 rounded-lg bg-stone-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-stone-700 transition-colors"
+              title="Copy a ChatGPT prompt with all your pantry items"
+            >
+              {copied ? (
+                <>
+                  <Check size={14} className="text-emerald-500" />
+                  <span className="text-emerald-600">Copied!</span>
+                </>
+              ) : (
+                <>
+                  <ClipboardCopy size={14} />
+                  Ask ChatGPT for a recipe
+                </>
+              )}
+            </button>
             <button
               onClick={allCollapsed ? expandAll : collapseAll}
               className="flex items-center gap-1.5 text-xs text-stone-500 hover:text-stone-700 transition-colors"
