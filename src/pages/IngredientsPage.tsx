@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/Input";
 import { Spinner } from "@/components/ui/Spinner";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { IngredientAutocomplete } from "@/components/ui/IngredientAutocomplete";
 import type { MasterIngredient, IngredientCategory } from "@/types/ingredient";
 import { INGREDIENT_CATEGORIES } from "@/types/ingredient";
 
@@ -269,10 +270,16 @@ export function IngredientsPage() {
       >
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="flex-1">
-            <Input
-              placeholder="Name (English)"
+            <IngredientAutocomplete
+              ingredients={ingredients}
               value={newName}
-              onChange={(e) => setNewName(e.target.value)}
+              placeholder="Name (English)"
+              className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-colors"
+              onChange={(v) => setNewName(v)}
+              onSelect={(mi) => {
+                setDuplicateMatch(mi);
+                setNewName(mi.name);
+              }}
             />
           </div>
           <div className="flex-1">

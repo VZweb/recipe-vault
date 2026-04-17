@@ -89,7 +89,7 @@ function docToPantryItem(id: string, data: DocumentData): PantryItem {
     unit: data.unit ?? null,
     isStaple: data.isStaple ?? false,
     imageUrl: data.imageUrl ?? null,
-    masterIngredientId: data.masterIngredientId ?? null,
+    masterIngredientId: data.masterIngredientId ?? "",
     note: data.note ?? "",
     addedAt: toDate(data.addedAt),
   };

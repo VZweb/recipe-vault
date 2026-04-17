@@ -50,22 +50,20 @@ export function SuggestionsPage() {
   const combinedPantry = useMemo<PantryItem[]>(
     () => [
       ...pantryItems,
-      ...extraIngredients
-        .filter((e) => e.masterIngredientId)
-        .map((e) => ({
-          id: `extra-${e.masterIngredientId}`,
-          name: e.name,
-          nameSecondary: e.nameSecondary || null,
-          normalizedName: e.name.toLowerCase(),
-          category: "Other" as const,
-          quantity: null,
-          unit: null,
-          isStaple: false,
-          imageUrl: null,
-          masterIngredientId: e.masterIngredientId,
-          note: "",
-          addedAt: new Date(),
-        })),
+      ...extraIngredients.map((e, i) => ({
+        id: e.masterIngredientId ? `extra-${e.masterIngredientId}` : `extra-freeform-${i}`,
+        name: e.name,
+        nameSecondary: e.nameSecondary || null,
+        normalizedName: e.name.toLowerCase(),
+        category: "Other" as const,
+        quantity: null,
+        unit: null,
+        isStaple: false,
+        imageUrl: null,
+        masterIngredientId: e.masterIngredientId ?? "",
+        note: "",
+        addedAt: new Date(),
+      })),
     ],
     [pantryItems, extraIngredients]
   );
@@ -113,12 +111,11 @@ export function SuggestionsPage() {
 
   const handleAddExtra = (e: React.FormEvent) => {
     e.preventDefault();
-    const name = extraIngredient.trim();
-    if (!name) return;
+    if (!pendingExtra.name.trim()) return;
     setExtraIngredients((prev) => [
       ...prev,
       {
-        name: pendingExtra.masterIngredientId ? pendingExtra.name : name,
+        name: pendingExtra.name,
         nameSecondary: pendingExtra.nameSecondary,
         masterIngredientId: pendingExtra.masterIngredientId,
       },
@@ -140,26 +137,28 @@ export function SuggestionsPage() {
       {/* Extra ingredient input */}
       <form
         onSubmit={handleAddExtra}
-        className="flex gap-2"
+        className="space-y-2"
       >
-        <IngredientAutocomplete
-          ingredients={masterIngredients}
-          value={extraIngredient}
-          placeholder="Add an ingredient not in your pantry..."
-          wrapperClassName="flex-1"
-          className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-          onChange={(v) => {
-            setExtraIngredient(v);
-            setPendingExtra({ name: v, nameSecondary: "", masterIngredientId: null });
-          }}
-          onSelect={(mi) => {
-            setExtraIngredient(mi.name);
-            setPendingExtra({ name: mi.name, nameSecondary: mi.nameGr, masterIngredientId: mi.id });
-          }}
-        />
-        <Button type="submit" variant="secondary" disabled={!extraIngredient.trim()}>
-          Add
-        </Button>
+        <div className="flex gap-2">
+          <IngredientAutocomplete
+            ingredients={masterIngredients}
+            value={extraIngredient}
+            placeholder="Add an ingredient not in your pantry..."
+            wrapperClassName="flex-1"
+            className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+            onChange={(v) => {
+              setExtraIngredient(v);
+              setPendingExtra({ name: v, nameSecondary: "", masterIngredientId: null });
+            }}
+            onSelect={(mi) => {
+              setExtraIngredient(mi.name);
+              setPendingExtra({ name: mi.name, nameSecondary: mi.nameGr, masterIngredientId: mi.id });
+            }}
+          />
+          <Button type="submit" variant="secondary" disabled={!pendingExtra.name.trim()}>
+            Add
+          </Button>
+        </div>
       </form>
 
       {extraIngredients.length > 0 && (
@@ -170,8 +169,8 @@ export function SuggestionsPage() {
               key={i}
               className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${
                 ing.masterIngredientId
-                  ? "bg-brand-50 text-brand-700"
-                  : "bg-sky-50 text-sky-700"
+                  ? "bg-green-50 text-green-700"
+                  : "bg-blue-950/10 text-blue-950"
               }`}
             >
               {ing.name}

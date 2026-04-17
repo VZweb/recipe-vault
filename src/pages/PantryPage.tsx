@@ -30,6 +30,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { IngredientAutocomplete } from "@/components/ui/IngredientAutocomplete";
+import { IngredientQuickAdd } from "@/components/ui/IngredientQuickAdd";
 import type { PantryItem, PantryCategory } from "@/types/pantry";
 import { PANTRY_CATEGORIES, PANTRY_UNITS } from "@/types/pantry";
 
@@ -66,7 +67,8 @@ export function PantryPage() {
   const [newNote, setNewNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const { ingredients: masterIngredients } = useIngredients();
+  const [quickAddName, setQuickAddName] = useState<string | null>(null);
+  const { ingredients: masterIngredients, add: addCatalogIngredient } = useIngredients();
 
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(
     new Set()
@@ -135,7 +137,7 @@ export function PantryPage() {
         unit,
         isStaple: newIsStaple,
         imageUrl: null,
-        masterIngredientId: newMasterIngredientId,
+        masterIngredientId: newMasterIngredientId!,
         note: newNote.trim(),
       });
 
@@ -160,7 +162,7 @@ export function PantryPage() {
           unit,
           isStaple: newIsStaple,
           imageUrl,
-          masterIngredientId: newMasterIngredientId,
+          masterIngredientId: newMasterIngredientId!,
           note: newNote.trim(),
           addedAt: new Date(),
         },
@@ -274,7 +276,7 @@ export function PantryPage() {
       }
       if (qty !== item.quantity) updates.quantity = qty;
       if (unit !== item.unit) updates.unit = unit;
-      if (editState.masterIngredientId !== item.masterIngredientId) {
+      if (editState.masterIngredientId && editState.masterIngredientId !== item.masterIngredientId) {
         updates.masterIngredientId = editState.masterIngredientId;
       }
       const trimmedNote = editState.note.trim();
@@ -313,7 +315,7 @@ export function PantryPage() {
                 quantity: qty,
                 unit,
                 imageUrl: newImageUrl,
-                masterIngredientId: editState.masterIngredientId,
+                masterIngredientId: editState.masterIngredientId ?? item.masterIngredientId,
                 note: trimmedNote,
               }
             : i
@@ -417,11 +419,13 @@ export function PantryPage() {
               onChange={(v) => {
                 setNewName(v);
                 setNewMasterIngredientId(null);
+                setQuickAddName(null);
               }}
               onSelect={(mi) => {
                 setNewName(mi.name);
                 setNewNameSecondary(mi.nameGr);
                 setNewMasterIngredientId(mi.id);
+                setQuickAddName(null);
                 if (mi.category) {
                   const pantryMatch = PANTRY_CATEGORIES.find(
                     (c) => c === mi.category
@@ -429,6 +433,7 @@ export function PantryPage() {
                   if (pantryMatch) setNewCategory(pantryMatch);
                 }
               }}
+              onCreateNew={(name) => setQuickAddName(name)}
             />
           </div>
           <div className="flex-1">
@@ -440,6 +445,78 @@ export function PantryPage() {
             />
           </div>
         </div>
+
+        {/* Quick-add to catalog — then auto-add to pantry */}
+        {quickAddName && !newMasterIngredientId && (
+          <IngredientQuickAdd
+            initialName={quickAddName}
+            ingredients={masterIngredients}
+            onCreate={addCatalogIngredient}
+            onCreated={async (mi) => {
+              setQuickAddName(null);
+
+              const pantryCategory = PANTRY_CATEGORIES.find((c) => c === mi.category) ?? newCategory;
+              const qty = newQuantity ? Number(newQuantity) : null;
+              const unit = newUnit || null;
+
+              const existing = findDuplicate(mi.name, mi.id);
+              if (existing) {
+                setNewName(mi.name);
+                setNewNameSecondary(mi.nameGr);
+                setNewMasterIngredientId(mi.id);
+                setNewCategory(pantryCategory);
+                setDuplicateMatch(existing);
+                return;
+              }
+
+              setSubmitting(true);
+              try {
+                const id = await addPantryItem({
+                  name: mi.name,
+                  nameSecondary: mi.nameGr || null,
+                  normalizedName: mi.name.toLowerCase(),
+                  category: pantryCategory,
+                  quantity: qty,
+                  unit,
+                  isStaple: newIsStaple,
+                  imageUrl: null,
+                  masterIngredientId: mi.id,
+                  note: newNote.trim(),
+                });
+
+                setItems((prev) => [
+                  ...prev,
+                  {
+                    id,
+                    name: mi.name,
+                    nameSecondary: mi.nameGr || null,
+                    normalizedName: mi.name.toLowerCase(),
+                    category: pantryCategory,
+                    quantity: qty,
+                    unit,
+                    isStaple: newIsStaple,
+                    imageUrl: null,
+                    masterIngredientId: mi.id,
+                    note: newNote.trim(),
+                    addedAt: new Date(),
+                  },
+                ]);
+
+                setNewName("");
+                setNewNameSecondary("");
+                setNewQuantity("");
+                setNewUnit("");
+                setNewIsStaple(false);
+                setNewMasterIngredientId(null);
+                setNewNote("");
+                clearImageSelection();
+              } finally {
+                setSubmitting(false);
+              }
+            }}
+            onCancel={() => setQuickAddName(null)}
+          />
+        )}
 
         {/* Row 2: Category, Quantity, Unit */}
         <div className="flex flex-col sm:flex-row gap-3">
@@ -563,8 +640,11 @@ export function PantryPage() {
             </div>
           )}
 
-          <div className="sm:ml-auto">
-            <Button type="submit" disabled={!newName.trim() || submitting}>
+          <div className="sm:ml-auto flex items-center gap-2">
+            {newName.trim() && !newMasterIngredientId && (
+              <span className="text-xs text-amber-600">Select from catalog or create new</span>
+            )}
+            <Button type="submit" disabled={!newName.trim() || !newMasterIngredientId || submitting}>
               {submitting ? (
                 <Spinner className="h-4 w-4" />
               ) : (
@@ -664,38 +744,51 @@ export function PantryPage() {
                           key={item.id}
                           className="space-y-3 rounded-lg border-2 border-brand-300 bg-brand-50/30 px-4 py-3"
                         >
-                          {/* Edit: Names */}
+                          {/* Edit: Names (locked when linked to catalog) */}
                           <div className="flex flex-col sm:flex-row gap-2">
-                            <IngredientAutocomplete
-                              ingredients={masterIngredients}
-                              value={editState.name}
-                              placeholder="Item name"
-                              wrapperClassName="flex-1"
-                              className="w-full rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-                              onChange={(v) =>
-                                setEditState((s) =>
-                                  s
-                                    ? {
-                                        ...s,
-                                        name: v,
-                                        masterIngredientId: null,
-                                      }
-                                    : s
-                                )
-                              }
-                              onSelect={(mi) =>
-                                setEditState((s) =>
-                                  s
-                                    ? {
-                                        ...s,
-                                        name: mi.name,
-                                        nameSecondary: mi.nameGr,
-                                        masterIngredientId: mi.id,
-                                      }
-                                    : s
-                                )
-                              }
-                            />
+                            {editState.masterIngredientId ? (
+                              <div className="flex-1 flex items-center gap-2">
+                                <input
+                                  value={editState.name}
+                                  readOnly
+                                  className="flex-1 rounded-lg border border-brand-200 bg-brand-50/30 px-3 py-1.5 text-sm text-stone-900 cursor-default"
+                                />
+                                <span className="text-brand-500 flex-shrink-0" title="Linked to catalog">
+                                  <Link2 size={14} />
+                                </span>
+                              </div>
+                            ) : (
+                              <IngredientAutocomplete
+                                ingredients={masterIngredients}
+                                value={editState.name}
+                                placeholder="Item name"
+                                wrapperClassName="flex-1"
+                                className="w-full rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                                onChange={(v) =>
+                                  setEditState((s) =>
+                                    s
+                                      ? {
+                                          ...s,
+                                          name: v,
+                                          masterIngredientId: null,
+                                        }
+                                      : s
+                                  )
+                                }
+                                onSelect={(mi) =>
+                                  setEditState((s) =>
+                                    s
+                                      ? {
+                                          ...s,
+                                          name: mi.name,
+                                          nameSecondary: mi.nameGr,
+                                          masterIngredientId: mi.id,
+                                        }
+                                      : s
+                                  )
+                                }
+                              />
+                            )}
                             <input
                               value={editState.nameSecondary}
                               onChange={(e) =>

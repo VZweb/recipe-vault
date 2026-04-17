@@ -8,8 +8,10 @@ interface Props {
   placeholder?: string;
   className?: string;
   wrapperClassName?: string;
+  readOnly?: boolean;
   onSelect: (ingredient: MasterIngredient) => void;
   onChange: (value: string) => void;
+  onCreateNew?: (typedName: string) => void;
 }
 
 export function IngredientAutocomplete({
@@ -18,8 +20,10 @@ export function IngredientAutocomplete({
   placeholder,
   className = "",
   wrapperClassName = "",
+  readOnly = false,
   onSelect,
   onChange,
+  onCreateNew,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [highlightIdx, setHighlightIdx] = useState(-1);
@@ -64,20 +68,28 @@ export function IngredientAutocomplete({
     }
   }, [highlightIdx]);
 
+  const showCreateOption = onCreateNew && query.length >= 2 && filtered.length === 0;
+  const totalItems = filtered.length + (showCreateOption ? 1 : 0);
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (!open || filtered.length === 0) return;
+    if (!open || totalItems === 0) return;
 
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setHighlightIdx((i) => (i < filtered.length - 1 ? i + 1 : 0));
+      setHighlightIdx((i) => (i < totalItems - 1 ? i + 1 : 0));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setHighlightIdx((i) => (i > 0 ? i - 1 : filtered.length - 1));
+      setHighlightIdx((i) => (i > 0 ? i - 1 : totalItems - 1));
     } else if (e.key === "Enter" && highlightIdx >= 0) {
       e.preventDefault();
-      const selected = filtered[highlightIdx];
-      if (selected) {
-        onSelect(selected);
+      if (highlightIdx < filtered.length) {
+        const selected = filtered[highlightIdx];
+        if (selected) {
+          onSelect(selected);
+          setOpen(false);
+        }
+      } else if (showCreateOption) {
+        onCreateNew(value.trim());
         setOpen(false);
       }
     } else if (e.key === "Escape") {
@@ -92,6 +104,7 @@ export function IngredientAutocomplete({
         value={value}
         placeholder={placeholder}
         className={className}
+        readOnly={readOnly}
         onChange={(e) => {
           onChange(e.target.value);
           setOpen(true);
@@ -102,7 +115,7 @@ export function IngredientAutocomplete({
         onKeyDown={handleKeyDown}
       />
 
-      {open && filtered.length > 0 && (
+      {open && totalItems > 0 && (
         <ul
           ref={listRef}
           className="absolute z-50 mt-1 max-h-48 w-full overflow-auto rounded-lg border border-stone-200 bg-white shadow-lg"
@@ -135,6 +148,26 @@ export function IngredientAutocomplete({
               )}
             </li>
           ))}
+          {showCreateOption && (
+            <li
+              onMouseDown={(e) => {
+                e.preventDefault();
+                onCreateNew(value.trim());
+                setOpen(false);
+              }}
+              onMouseEnter={() => setHighlightIdx(filtered.length)}
+              className={`cursor-pointer px-3 py-2 text-sm border-t border-stone-100 ${
+                highlightIdx === filtered.length
+                  ? "bg-amber-50 text-amber-800"
+                  : "text-amber-700 hover:bg-amber-50/50"
+              }`}
+            >
+              <span className="font-medium">+ Create "{value.trim()}"</span>
+              <span className="ml-1.5 text-xs text-amber-500">
+                (not in catalog)
+              </span>
+            </li>
+          )}
         </ul>
       )}
     </div>

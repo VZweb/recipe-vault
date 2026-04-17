@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, ChevronDown, ChevronUp, ClipboardPaste, ImagePlus, LayoutList, Link, Link2, MessageSquare, Plus, Trash2, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ChevronDown, ChevronUp, ClipboardPaste, ImagePlus, LayoutList, Link, Link2, MessageSquare, Plus, Trash2, X } from "lucide-react";
 import { parseIngredientText } from "@/lib/parseIngredients";
 import { parseStepsText } from "@/lib/parseSteps";
 import { useRecipe, useRecipeMutations } from "@/hooks/useRecipes";
@@ -15,6 +15,7 @@ import { TagChip } from "@/components/ui/TagChip";
 import { CategoryIcon } from "@/components/ui/CategoryIcon";
 import { Spinner } from "@/components/ui/Spinner";
 import { IngredientAutocomplete } from "@/components/ui/IngredientAutocomplete";
+import { IngredientQuickAdd } from "@/components/ui/IngredientQuickAdd";
 import type { Ingredient, Step, RecipeFormData } from "@/types/recipe";
 
 function emptyIngredient(sortOrder: number): Ingredient {
@@ -53,7 +54,7 @@ export function RecipeEditorPage() {
   const { categories } = useCategories();
   const { create, update } = useRecipeMutations();
   const { upload, uploading } = useImageUpload();
-  const { ingredients: masterIngredients } = useIngredients();
+  const { ingredients: masterIngredients, add: addCatalogIngredient } = useIngredients();
 
   const [form, setForm] = useState<RecipeFormData>(defaultForm);
   const [saving, setSaving] = useState(false);
@@ -65,6 +66,9 @@ export function RecipeEditorPage() {
   const [pasteText, setPasteText] = useState("");
   const [stepsPasteOpen, setStepsPasteOpen] = useState(false);
   const [stepsPasteText, setStepsPasteText] = useState("");
+  const [quickAddIdx, setQuickAddIdx] = useState<number | null>(null);
+  const [pasteReview, setPasteReview] = useState<Ingredient[] | null>(null);
+  const [pasteReviewQuickAddIdx, setPasteReviewQuickAddIdx] = useState<number | null>(null);
 
   useEffect(() => {
     if (recipe && isEditing) {
@@ -129,6 +133,11 @@ export function RecipeEditorPage() {
     }));
   };
 
+  const unlinkedCount = useMemo(
+    () => form.ingredients.filter((i) => !i.isSection && i.name.trim() && !i.masterIngredientId).length,
+    [form.ingredients]
+  );
+
   const handlePasteIngredients = () => {
     if (!pasteText.trim()) return;
     const parsed = parseIngredientText(
@@ -137,6 +146,18 @@ export function RecipeEditorPage() {
       form.ingredients.length,
     );
     if (parsed.length === 0) return;
+
+    const unmatched = parsed.filter((i) => !i.isSection && !i.masterIngredientId);
+    if (unmatched.length > 0) {
+      setPasteReview(parsed);
+      setPasteReviewQuickAddIdx(null);
+      return;
+    }
+
+    applyParsedIngredients(parsed);
+  };
+
+  const applyParsedIngredients = (parsed: Ingredient[]) => {
     setForm((prev) => ({
       ...prev,
       ingredients: [...prev.ingredients, ...parsed].map((ing, i) => ({
@@ -151,6 +172,8 @@ export function RecipeEditorPage() {
     setNoteOpenSet(newNotes);
     setPasteText("");
     setPasteOpen(false);
+    setPasteReview(null);
+    setPasteReviewQuickAddIdx(null);
   };
 
   const removeIngredient = (idx: number) => {
@@ -563,7 +586,8 @@ export function RecipeEditorPage() {
                 </button>
               </div>
             ) : (
-              <div key={idx} className="flex flex-wrap items-center gap-2">
+              <div key={idx} className="space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <div className="flex flex-col flex-shrink-0">
                   <button type="button" onClick={() => moveIngredient(idx, -1)} disabled={idx === 0} className="p-0.5 text-stone-400 hover:text-stone-600 disabled:opacity-25 disabled:cursor-default transition-colors"><ChevronUp size={14} /></button>
                   <button type="button" onClick={() => moveIngredient(idx, 1)} disabled={idx === form.ingredients.length - 1} className="p-0.5 text-stone-400 hover:text-stone-600 disabled:opacity-25 disabled:cursor-default transition-colors"><ChevronDown size={14} /></button>
@@ -598,14 +622,19 @@ export function RecipeEditorPage() {
                       ? "border-brand-300 bg-brand-50/30"
                       : "border-stone-300"
                   }`}
-                  onChange={(v) => updateIngredient(idx, { name: v, masterIngredientId: null })}
-                  onSelect={(mi) =>
+                  onChange={(v) => {
+                    updateIngredient(idx, { name: v, masterIngredientId: null });
+                    if (quickAddIdx === idx) setQuickAddIdx(null);
+                  }}
+                  onSelect={(mi) => {
                     updateIngredient(idx, {
                       name: mi.name,
                       nameSecondary: mi.nameGr,
                       masterIngredientId: mi.id,
-                    })
-                  }
+                    });
+                    if (quickAddIdx === idx) setQuickAddIdx(null);
+                  }}
+                  onCreateNew={() => setQuickAddIdx(idx)}
                 />
                 {ing.masterIngredientId ? (
                   <span title="Linked to catalog" className="flex-shrink-0 text-brand-500">
@@ -613,8 +642,8 @@ export function RecipeEditorPage() {
                   </span>
                 ) : (
                   ing.name.trim() && (
-                    <span title="Not in catalog" className="flex-shrink-0 text-stone-300">
-                      <Link2 size={14} />
+                    <span title="Not in catalog — link to catalog for suggestions to work" className="flex-shrink-0 text-amber-400">
+                      <AlertTriangle size={14} />
                     </span>
                   )
                 )}
@@ -661,9 +690,35 @@ export function RecipeEditorPage() {
                   <Trash2 size={16} />
                 </button>
               </div>
+              {quickAddIdx === idx && (
+                <IngredientQuickAdd
+                  initialName={ing.name}
+                  ingredients={masterIngredients}
+                  onCreate={addCatalogIngredient}
+                  onCreated={(mi) => {
+                    updateIngredient(idx, {
+                      name: mi.name,
+                      nameSecondary: mi.nameGr,
+                      masterIngredientId: mi.id,
+                    });
+                    setQuickAddIdx(null);
+                  }}
+                  onCancel={() => setQuickAddIdx(null)}
+                />
+              )}
+              </div>
             )
           )}
         </div>
+        {unlinkedCount > 0 && (
+          <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            <AlertTriangle size={14} className="mt-0.5 flex-shrink-0 text-amber-500" />
+            <p>
+              <span className="font-semibold">{unlinkedCount}</span> ingredient{unlinkedCount > 1 ? "s" : ""} not linked to the catalog.
+              {" "}Unlinked ingredients won't appear in suggestions. Select from the dropdown or create new catalog entries.
+            </p>
+          </div>
+        )}
         <div className="flex gap-2">
           <Button type="button" variant="ghost" size="sm" onClick={addIngredient}>
             <Plus size={16} />
@@ -697,6 +752,111 @@ export function RecipeEditorPage() {
               <span className="text-xs text-stone-400 ml-auto">
                 Quantities, units & catalog matches are detected automatically
               </span>
+            </div>
+          </div>
+        )}
+
+        {/* Paste review: resolve unmatched ingredients */}
+        {pasteReview && (
+          <div className="rounded-lg border border-amber-300 bg-amber-50/60 p-4 space-y-3">
+            <div className="flex items-start gap-2">
+              <AlertTriangle size={16} className="mt-0.5 flex-shrink-0 text-amber-600" />
+              <div>
+                <p className="text-sm font-medium text-amber-900">
+                  {pasteReview.filter((i) => !i.isSection && !i.masterIngredientId).length} ingredient{pasteReview.filter((i) => !i.isSection && !i.masterIngredientId).length > 1 ? "s" : ""} not found in catalog
+                </p>
+                <p className="text-xs text-amber-700 mt-0.5">
+                  You can create catalog entries now, add all including unmatched, or skip unmatched. Unlinked ingredients can be linked later when editing the recipe.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2 max-h-64 overflow-auto">
+              {pasteReview.filter((i) => !i.isSection).map((ing, ri) => (
+                <div key={ri} className="flex items-center gap-3">
+                  <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                    ing.masterIngredientId ? "bg-brand-50 text-brand-700" : "bg-amber-100 text-amber-800"
+                  }`}>
+                    {ing.masterIngredientId ? <Link2 size={10} /> : <AlertTriangle size={10} />}
+                    {ing.name}
+                    {ing.quantity != null && ` (${ing.quantity}${ing.unit ? " " + ing.unit : ""})`}
+                  </span>
+                  {!ing.masterIngredientId && pasteReviewQuickAddIdx !== ri && (
+                    <button
+                      type="button"
+                      onClick={() => setPasteReviewQuickAddIdx(ri)}
+                      className="text-xs font-medium text-amber-700 hover:text-amber-900 underline"
+                    >
+                      Create in catalog
+                    </button>
+                  )}
+                  {ing.masterIngredientId && (
+                    <span className="text-xs text-brand-600">Linked</span>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {pasteReviewQuickAddIdx !== null && (() => {
+              const unresolvedNonSections = pasteReview.filter((i) => !i.isSection);
+              const target = unresolvedNonSections[pasteReviewQuickAddIdx];
+              if (!target || target.masterIngredientId) return null;
+              return (
+                <IngredientQuickAdd
+                  initialName={target.name}
+                  ingredients={masterIngredients}
+                  onCreate={addCatalogIngredient}
+                  onCreated={(mi) => {
+                    setPasteReview((prev) => {
+                      if (!prev) return prev;
+                      let nsIdx = 0;
+                      return prev.map((i) => {
+                        if (i.isSection) return i;
+                        if (nsIdx === pasteReviewQuickAddIdx) {
+                          nsIdx++;
+                          return { ...i, name: mi.name, nameSecondary: mi.nameGr, masterIngredientId: mi.id };
+                        }
+                        nsIdx++;
+                        return i;
+                      });
+                    });
+                    setPasteReviewQuickAddIdx(null);
+                  }}
+                  onCancel={() => setPasteReviewQuickAddIdx(null)}
+                />
+              );
+            })()}
+
+            <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-amber-200">
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => applyParsedIngredients(pasteReview)}
+              >
+                Add All ({pasteReview.filter((i) => !i.isSection).length})
+              </Button>
+              {pasteReview.some((i) => !i.isSection && !i.masterIngredientId) && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    const linked = pasteReview.filter((i) => i.isSection || i.masterIngredientId);
+                    if (linked.length > 0) applyParsedIngredients(linked);
+                    else { setPasteReview(null); setPasteReviewQuickAddIdx(null); }
+                  }}
+                >
+                  Only Linked ({pasteReview.filter((i) => !i.isSection && i.masterIngredientId).length})
+                </Button>
+              )}
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => { setPasteReview(null); setPasteReviewQuickAddIdx(null); }}
+              >
+                Cancel
+              </Button>
             </div>
           </div>
         )}

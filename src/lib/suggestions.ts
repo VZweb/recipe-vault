@@ -15,7 +15,7 @@ export function suggestRecipes(
   pantryItems: PantryItem[]
 ): SuggestionResult[] {
   const allMasterIds = new Set(
-    pantryItems.map((p) => p.masterIngredientId).filter(Boolean)
+    pantryItems.map((p) => p.masterIngredientId).filter((id) => id !== "")
   );
 
   const results: SuggestionResult[] = recipes.map((recipe) => {
