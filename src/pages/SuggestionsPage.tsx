@@ -6,7 +6,6 @@ import { useTags } from "@/hooks/useTags";
 import { useIngredients } from "@/hooks/useIngredients";
 import { fetchPantryItems } from "@/lib/firestore";
 import { suggestRecipes, type SuggestionResult } from "@/lib/suggestions";
-import { normalizeText } from "@/lib/normalize";
 import { Button } from "@/components/ui/Button";
 import { TagChip } from "@/components/ui/TagChip";
 import { Spinner } from "@/components/ui/Spinner";
@@ -48,18 +47,6 @@ export function SuggestionsPage() {
     void loadPantry();
   }, [loadPantry]);
 
-  const allAvailable = useMemo(
-    () => [
-      ...pantryItems.flatMap((p) =>
-        p.nameSecondary ? [p.name, p.nameSecondary] : [p.name]
-      ),
-      ...extraIngredients.flatMap((e) =>
-        e.nameSecondary ? [e.name, e.nameSecondary] : [e.name]
-      ),
-    ],
-    [pantryItems, extraIngredients]
-  );
-
   const combinedPantry = useMemo<PantryItem[]>(
     () => [
       ...pantryItems,
@@ -84,8 +71,8 @@ export function SuggestionsPage() {
   );
 
   const suggestions = useMemo(
-    () => suggestRecipes(recipes, allAvailable, combinedPantry),
-    [recipes, allAvailable, combinedPantry]
+    () => suggestRecipes(recipes, combinedPantry),
+    [recipes, combinedPantry]
   );
 
   const unmatchedExtras = useMemo(() => {
@@ -102,14 +89,11 @@ export function SuggestionsPage() {
 
   const matchedExtrasPerRecipe = useMemo(() => {
     if (extraIngredients.length === 0) return new Map<string, string[]>();
-    const extraMasterIds = new Set(
-      extraIngredients.map((e) => e.masterIngredientId).filter(Boolean)
+    const extraById = new Map(
+      extraIngredients
+        .filter((e) => e.masterIngredientId)
+        .map((e) => [e.masterIngredientId!, e.name])
     );
-    const extraNormalized = extraIngredients.map((e) => ({
-      name: e.name,
-      norm: normalizeText(e.name),
-      normSecondary: e.nameSecondary ? normalizeText(e.nameSecondary) : null,
-    }));
 
     const map = new Map<string, string[]>();
     for (const s of suggestions) {
@@ -117,22 +101,9 @@ export function SuggestionsPage() {
       for (const ing of s.recipe.ingredients) {
         if (ing.isSection) continue;
         if (!s.matchedIngredients.includes(ing.name)) continue;
-        if (ing.masterIngredientId && extraMasterIds.has(ing.masterIngredientId)) {
-          const extra = extraIngredients.find(
-            (e) => e.masterIngredientId === ing.masterIngredientId
-          );
-          if (extra && !hits.includes(extra.name)) hits.push(extra.name);
-          continue;
-        }
-        const ingNorm = normalizeText(ing.name);
-        const ingNormSec = ing.nameSecondary ? normalizeText(ing.nameSecondary) : null;
-        for (const ex of extraNormalized) {
-          const candidates = [ingNorm, ...(ingNormSec ? [ingNormSec] : [])];
-          const extraCandidates = [ex.norm, ...(ex.normSecondary ? [ex.normSecondary] : [])];
-          const isMatch = candidates.some((c) =>
-            extraCandidates.some((ec) => c === ec)
-          );
-          if (isMatch && !hits.includes(ex.name)) hits.push(ex.name);
+        if (ing.masterIngredientId && extraById.has(ing.masterIngredientId)) {
+          const name = extraById.get(ing.masterIngredientId)!;
+          if (!hits.includes(name)) hits.push(name);
         }
       }
       if (hits.length > 0) map.set(s.recipe.id, hits);

@@ -60,30 +60,11 @@ export function RecipeDetailPage() {
     [pantryItems]
   );
 
-  const pantryNames = useMemo(() => {
-    const normalize = (s: string) =>
-      s.toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/ς/g, "σ").replace(/\s+/g, " ");
-    return pantryItems.flatMap((p) => {
-      const names = [normalize(p.name)];
-      if (p.nameSecondary) names.push(normalize(p.nameSecondary));
-      return names;
-    });
-  }, [pantryItems]);
-
   const isInPantry = useCallback(
-    (name: string, nameSecondary?: string, masterIngredientId?: string | null) => {
-      if (masterIngredientId && pantryMasterIds.has(masterIngredientId)) {
-        return true;
-      }
-      const normalize = (s: string) =>
-        s.toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/ς/g, "σ").replace(/\s+/g, " ");
-      const candidates = [normalize(name)];
-      if (nameSecondary?.trim()) candidates.push(normalize(nameSecondary));
-      return pantryNames.some((p) =>
-        candidates.some((c) => c.includes(p) || p.includes(c))
-      );
+    (_name: string, _nameSecondary?: string, masterIngredientId?: string | null) => {
+      return !!masterIngredientId && pantryMasterIds.has(masterIngredientId);
     },
-    [pantryNames, pantryMasterIds]
+    [pantryMasterIds]
   );
 
   if (loading) {
