@@ -344,6 +344,16 @@ export function PantryPage() {
     setCollapsedCategories(new Set());
   };
 
+  const aliasMap = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const mi of masterIngredients) {
+      if (mi.aliases.length > 0) {
+        map.set(mi.id, mi.aliases.map(normalizeText));
+      }
+    }
+    return map;
+  }, [masterIngredients]);
+
   const filteredItems = useMemo(() => {
     if (!searchQuery.trim()) return items;
     const q = normalizeText(searchQuery);
@@ -352,10 +362,11 @@ export function PantryPage() {
         normalizeText(item.name),
         normalizeText(item.nameSecondary ?? ""),
         normalizeText(item.note ?? ""),
+        ...(item.masterIngredientId ? aliasMap.get(item.masterIngredientId) ?? [] : []),
       ].filter(Boolean);
       return targets.some((t) => t.includes(q));
     });
-  }, [items, searchQuery]);
+  }, [items, searchQuery, aliasMap]);
 
   const grouped = PANTRY_CATEGORIES.reduce(
     (acc, cat) => {
