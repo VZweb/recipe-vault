@@ -71,14 +71,14 @@ export function AppLayout() {
       </header>
 
       {/* Main content */}
-      <main className="flex-1">
+      <main className="flex-1 pb-16 md:pb-0">
         <div className="mx-auto max-w-5xl px-4 py-6">
           <Outlet />
         </div>
       </main>
 
       {/* Mobile bottom nav */}
-      <nav className="sticky bottom-0 z-30 border-t border-stone-200 bg-white md:hidden">
+      <nav className="fixed bottom-0 left-0 right-0 z-30 border-t border-stone-200 bg-white md:hidden">
         <div className="flex items-center justify-around">
           {navItems.map(({ to, icon: Icon, label }) => (
             <NavLink
