@@ -12,7 +12,6 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { TagChip } from "@/components/ui/TagChip";
-import { CategoryIcon } from "@/components/ui/CategoryIcon";
 import { Spinner } from "@/components/ui/Spinner";
 import { IngredientAutocomplete } from "@/components/ui/IngredientAutocomplete";
 import { IngredientQuickAdd } from "@/components/ui/IngredientQuickAdd";
