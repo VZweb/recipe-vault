@@ -109,6 +109,17 @@ export function SuggestionsPage() {
     return map;
   }, [extraIngredients, suggestions]);
 
+  const sortedSuggestions = useMemo(() => {
+    if (extraIngredients.length === 0) return suggestions;
+    const extrasMap = matchedExtrasPerRecipe;
+    return [...suggestions].sort((a, b) => {
+      const aExtras = extrasMap.get(a.recipe.id)?.length ?? 0;
+      const bExtras = extrasMap.get(b.recipe.id)?.length ?? 0;
+      if (aExtras !== bExtras) return bExtras - aExtras;
+      return b.matchPercentage - a.matchPercentage;
+    });
+  }, [suggestions, extraIngredients.length, matchedExtrasPerRecipe]);
+
   const pantryMasterIds = useMemo(
     () => new Set(pantryItems.map((p) => p.masterIngredientId).filter(Boolean)),
     [pantryItems]
@@ -195,6 +206,12 @@ export function SuggestionsPage() {
               </button>
             </span>
           ))}
+          <button
+            onClick={() => setExtraIngredients([])}
+            className="self-center rounded-full px-2 py-0.5 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
+          >
+            Clear all
+          </button>
         </div>
       )}
 
@@ -203,7 +220,7 @@ export function SuggestionsPage() {
         <div className="flex justify-center py-16">
           <Spinner className="h-8 w-8" />
         </div>
-      ) : suggestions.length > 0 ? (
+      ) : sortedSuggestions.length > 0 ? (
         <div className="space-y-4">
           {unmatchedExtras.length > 0 && (
             <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
@@ -217,7 +234,7 @@ export function SuggestionsPage() {
               </p>
             </div>
           )}
-          {suggestions.map((s) => (
+          {sortedSuggestions.map((s) => (
             <SuggestionCard
               key={s.recipe.id}
               suggestion={s}
@@ -326,7 +343,7 @@ function SuggestionCard({
 
         {matchedExtras.length > 0 && (
           <p className="mt-1 text-xs font-medium text-brand-600">
-            Uses your added: {matchedExtras.join(", ")}
+            You added: {matchedExtras.join(", ")}
           </p>
         )}
 
