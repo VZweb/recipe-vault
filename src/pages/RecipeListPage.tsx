@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { BookOpen, Plus, Search } from "lucide-react";
+import { BookOpen, Filter, Plus, Search, X } from "lucide-react";
 import { useRecipes } from "@/hooks/useRecipes";
 import { useTags } from "@/hooks/useTags";
 import { useCategories } from "@/hooks/useCategories";
@@ -27,6 +27,8 @@ export function RecipeListPage() {
   );
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<SortOption>("newest");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [activeTagCategory, setActiveTagCategory] = useState<string | null>(null);
 
   const tagFilter = useMemo(
     () => (selectedTags.length > 0 ? selectedTags : undefined),
@@ -141,57 +143,62 @@ export function RecipeListPage() {
         </select>
       </div>
 
-      {/* Category filters */}
-      {categories.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {categories.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => {
-                const next = selectedCategory === cat.id ? undefined : cat.id;
-                setSelectedCategory(next);
-                setSearchParams((prev) => {
-                  if (next) prev.set("category", next);
-                  else prev.delete("category");
-                  return prev;
-                });
-              }}
-              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all border ${
-                selectedCategory === cat.id
-                  ? "border-brand-400 bg-brand-50 text-brand-700 ring-2 ring-brand-400/30"
-                  : "border-stone-200 bg-white text-stone-600 hover:border-stone-300 hover:bg-stone-50"
-              }`}
-            >
-              <CategoryIcon icon={cat.icon} size={14} />
-              {cat.name}
-            </button>
-          ))}
-        </div>
-      )}
+      {/* Filters */}
+      <div className="space-y-3">
+        {/* Active filters + toggle */}
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setFiltersOpen((o) => !o)}
+            className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all ${
+              filtersOpen
+                ? "border-brand-400 bg-brand-50 text-brand-700"
+                : "border-stone-200 bg-white text-stone-600 hover:border-stone-300 hover:bg-stone-50"
+            }`}
+          >
+            <Filter size={14} />
+            Filters
+            {(selectedTags.length > 0 || selectedCategory) && (
+              <span className="flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-brand-600 px-1 text-[10px] font-bold text-white">
+                {selectedTags.length + (selectedCategory ? 1 : 0)}
+              </span>
+            )}
+          </button>
 
-      {/* Tag filters */}
-      {tags.length > 0 && (
-        <div className="space-y-2">
-          {TAG_CATEGORIES.map((cat) => {
-            const catTags = tags.filter((t) => t.category === cat);
-            if (catTags.length === 0) return null;
+          {activeCategory && (
+            <span className="inline-flex items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-700">
+              <CategoryIcon icon={activeCategory.icon} size={14} />
+              {activeCategory.name}
+              <button
+                onClick={() => {
+                  setSelectedCategory(undefined);
+                  setSearchParams((prev) => {
+                    prev.delete("category");
+                    return prev;
+                  });
+                }}
+                className="ml-0.5 rounded-full p-0.5 hover:bg-brand-200 transition-colors"
+                aria-label="Remove category filter"
+              >
+                <X size={12} />
+              </button>
+            </span>
+          )}
+
+          {selectedTags.map((id) => {
+            const tag = tags.find((t) => t.id === id);
+            if (!tag) return null;
             return (
-              <div key={cat} className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-medium text-stone-400 uppercase tracking-wide w-20 flex-shrink-0">
-                  {cat}
-                </span>
-                {catTags.map((tag) => (
-                  <TagChip
-                    key={tag.id}
-                    name={tag.name}
-                    color={tag.color}
-                    selected={selectedTags.includes(tag.id)}
-                    onClick={() => toggleTag(tag.id)}
-                  />
-                ))}
-              </div>
+              <TagChip
+                key={id}
+                name={tag.name}
+                color={tag.color}
+                selected
+                onRemove={() => toggleTag(id)}
+              />
             );
           })}
+
           {(selectedTags.length > 0 || selectedCategory) && (
             <button
               onClick={() => {
@@ -204,11 +211,98 @@ export function RecipeListPage() {
               }}
               className="text-xs text-stone-500 hover:text-stone-700 underline"
             >
-              Clear all filters
+              Clear all
             </button>
           )}
         </div>
-      )}
+
+        {/* Collapsible filter panel */}
+        {filtersOpen && (
+          <div className="rounded-xl border border-stone-200 bg-white p-4 space-y-4">
+            {/* Category dropdown */}
+            {categories.length > 0 && (
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-medium text-stone-500 uppercase tracking-wide w-16 flex-shrink-0">
+                  Category
+                </span>
+                <select
+                  value={selectedCategory ?? ""}
+                  onChange={(e) => {
+                    const next = e.target.value || undefined;
+                    setSelectedCategory(next);
+                    setSearchParams((prev) => {
+                      if (next) prev.set("category", next);
+                      else prev.delete("category");
+                      return prev;
+                    });
+                  }}
+                  className="flex-1 rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-700 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-colors"
+                >
+                  <option value="">All categories</option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Tag category tabs */}
+            {tags.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex flex-wrap gap-1.5">
+                  {TAG_CATEGORIES.map((cat) => {
+                    const catTags = tags.filter((t) => t.category === cat);
+                    if (catTags.length === 0) return null;
+                    const isActive = activeTagCategory === cat;
+                    const count = catTags.filter((t) =>
+                      selectedTags.includes(t.id)
+                    ).length;
+                    return (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() =>
+                          setActiveTagCategory(isActive ? null : cat)
+                        }
+                        className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
+                          isActive
+                            ? "bg-brand-100 text-brand-700 ring-1 ring-brand-300"
+                            : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+                        }`}
+                      >
+                        {cat}
+                        {count > 0 && (
+                          <span className="flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-brand-600 px-1 text-[10px] font-bold text-white">
+                            {count}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {activeTagCategory && (
+                  <div className="flex flex-wrap gap-2 rounded-lg border border-stone-100 bg-stone-50 p-3">
+                    {tags
+                      .filter((t) => t.category === activeTagCategory)
+                      .map((tag) => (
+                        <TagChip
+                          key={tag.id}
+                          name={tag.name}
+                          color={tag.color}
+                          selected={selectedTags.includes(tag.id)}
+                          onClick={() => toggleTag(tag.id)}
+                        />
+                      ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Results */}
       {loading ? (
