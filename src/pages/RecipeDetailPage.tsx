@@ -35,6 +35,7 @@ export function RecipeDetailPage() {
   const [imageIdx, setImageIdx] = useState(0);
   const [cookedCount, setCookedCount] = useState(0);
   const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
+  const [checkedSteps, setCheckedSteps] = useState<Set<number>>(new Set());
 
   const loadPantry = useCallback(async () => {
     const items = await fetchPantryItems();
@@ -363,29 +364,64 @@ export function RecipeDetailPage() {
 
         {/* Steps */}
         <div>
-          <h2 className="text-lg font-semibold text-stone-800 mb-3">Steps</h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold text-stone-800">Steps</h2>
+            {checkedSteps.size > 0 && (
+              <span className="text-xs text-stone-400">
+                {checkedSteps.size}/{recipe.steps.length} done
+              </span>
+            )}
+          </div>
           <ol className="space-y-6">
             {recipe.steps
               .sort((a, b) => a.sortOrder - b.sortOrder)
-              .map((step, i) => (
-                <li key={i} className="flex gap-4">
-                  <span className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-brand-100 text-sm font-semibold text-brand-700">
-                    {i + 1}
-                  </span>
-                  <div className="flex-1 space-y-2">
-                    <p className="text-sm text-stone-700 leading-relaxed">
-                      {step.instruction}
-                    </p>
-                    {step.imageUrl && (
-                      <img
-                        src={step.imageUrl}
-                        alt={`Step ${i + 1}`}
-                        className="mt-2 max-h-48 rounded-lg object-cover"
-                      />
-                    )}
-                  </div>
-                </li>
-              ))}
+              .map((step, i) => {
+                const done = checkedSteps.has(i);
+                return (
+                  <li
+                    key={i}
+                    className={`flex gap-4 cursor-pointer group transition-opacity ${
+                      done ? "opacity-50" : ""
+                    }`}
+                    onClick={() =>
+                      setCheckedSteps((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(i)) next.delete(i);
+                        else next.add(i);
+                        return next;
+                      })
+                    }
+                  >
+                    <span
+                      className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-sm font-semibold transition-colors ${
+                        done
+                          ? "bg-green-100 text-green-700"
+                          : "bg-brand-100 text-brand-700 group-hover:bg-brand-200"
+                      }`}
+                    >
+                      {done ? <Check size={14} /> : i + 1}
+                    </span>
+                    <div className="flex-1 space-y-2">
+                      <p
+                        className={`text-sm leading-relaxed transition-colors ${
+                          done
+                            ? "line-through text-stone-400"
+                            : "text-stone-700"
+                        }`}
+                      >
+                        {step.instruction}
+                      </p>
+                      {step.imageUrl && (
+                        <img
+                          src={step.imageUrl}
+                          alt={`Step ${i + 1}`}
+                          className="mt-2 max-h-48 rounded-lg object-cover"
+                        />
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
           </ol>
         </div>
       </div>
