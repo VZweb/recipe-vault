@@ -12,12 +12,16 @@ import { CategoryIcon } from "@/components/ui/CategoryIcon";
 import { Button } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { TAG_CATEGORIES } from "@/types/tag";
 
 type SortOption = "newest" | "oldest" | "a-z" | "z-a" | "fastest" | "most-cooked";
 
 export function RecipeListPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [selectedTags, setSelectedTags] = useState<string[]>(() => {
+    const t = searchParams.get("tag");
+    return t ? [t] : [];
+  });
   const [selectedCategory, setSelectedCategory] = useState<string | undefined>(
     () => searchParams.get("category") || undefined
   );
@@ -167,16 +171,27 @@ export function RecipeListPage() {
 
       {/* Tag filters */}
       {tags.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {tags.map((tag) => (
-            <TagChip
-              key={tag.id}
-              name={tag.name}
-              color={tag.color}
-              selected={selectedTags.includes(tag.id)}
-              onClick={() => toggleTag(tag.id)}
-            />
-          ))}
+        <div className="space-y-2">
+          {TAG_CATEGORIES.map((cat) => {
+            const catTags = tags.filter((t) => t.category === cat);
+            if (catTags.length === 0) return null;
+            return (
+              <div key={cat} className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-medium text-stone-400 uppercase tracking-wide w-20 flex-shrink-0">
+                  {cat}
+                </span>
+                {catTags.map((tag) => (
+                  <TagChip
+                    key={tag.id}
+                    name={tag.name}
+                    color={tag.color}
+                    selected={selectedTags.includes(tag.id)}
+                    onClick={() => toggleTag(tag.id)}
+                  />
+                ))}
+              </div>
+            );
+          })}
           {(selectedTags.length > 0 || selectedCategory) && (
             <button
               onClick={() => {

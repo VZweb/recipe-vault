@@ -2,7 +2,18 @@ export interface Tag {
   id: string;
   name: string;
   color: string;
+  category: string;
 }
+
+export const TAG_CATEGORIES = [
+  "Time",
+  "Method",
+  "Diet / Nutrition",
+  "Cuisine",
+  "Occasion",
+  "Flavor",
+  "Other",
+] as const;
 
 export const TAG_COLORS = [
   "#ef4444",

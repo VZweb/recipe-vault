@@ -66,6 +66,7 @@ function docToTag(id: string, data: DocumentData): Tag {
     id,
     name: data.name ?? "",
     color: data.color ?? "#78716c",
+    category: data.category ?? "Other",
   };
 }
 
@@ -188,15 +189,16 @@ export async function fetchTags(): Promise<Tag[]> {
 
 export async function createTag(
   name: string,
-  color: string
+  color: string,
+  category: string = "Other"
 ): Promise<string> {
-  const docRef = await addDoc(tagsCol, { name, color });
+  const docRef = await addDoc(tagsCol, { name, color, category });
   return docRef.id;
 }
 
 export async function updateTag(
   id: string,
-  fields: { name?: string; color?: string }
+  fields: { name?: string; color?: string; category?: string }
 ): Promise<void> {
   await updateDoc(doc(db, "tags", id), fields);
 }

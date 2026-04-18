@@ -22,13 +22,13 @@ export function useTags() {
     void load();
   }, [load]);
 
-  const add = async (name: string, color: string) => {
-    const id = await createTag(name, color);
-    setTags((prev) => [...prev, { id, name, color }].sort((a, b) => a.name.localeCompare(b.name)));
+  const add = async (name: string, color: string, category: string = "Other") => {
+    const id = await createTag(name, color, category);
+    setTags((prev) => [...prev, { id, name, color, category }].sort((a, b) => a.name.localeCompare(b.name)));
     return id;
   };
 
-  const update = async (id: string, fields: { name?: string; color?: string }) => {
+  const update = async (id: string, fields: { name?: string; color?: string; category?: string }) => {
     await updateTag(id, fields);
     setTags((prev) =>
       prev

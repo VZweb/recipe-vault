@@ -22,7 +22,7 @@ const dryRun = args.includes("--dry-run");
 
 const saPath =
   process.env.GOOGLE_APPLICATION_CREDENTIALS ||
-  path.resolve(new URL(".", import.meta.url).pathname, "service-account.json");
+  path.resolve(decodeURIComponent(new URL(".", import.meta.url).pathname), "service-account.json");
 
 initializeApp({ credential: cert(saPath) });
 const db = getFirestore();
@@ -51,45 +51,61 @@ const DEFAULT_CATEGORIES = [
 ];
 
 const DEFAULT_TAGS = [
-  // Cooking Method / Equipment
-  { name: "Air Fryer", color: "#ef4444" },
-  { name: "Pressure Cooker", color: "#f97316" },
-  { name: "Slow Cooker", color: "#eab308" },
-  { name: "Grill", color: "#ef4444" },
-  { name: "Oven-Baked", color: "#f97316" },
-  { name: "Stovetop", color: "#eab308" },
-  { name: "No-Cook", color: "#22c55e" },
-  { name: "One-Pot", color: "#06b6d4" },
-  { name: "Sheet Pan", color: "#3b82f6" },
-  // Dietary & Health
-  { name: "Vegetarian", color: "#22c55e" },
-  { name: "Vegan", color: "#22c55e" },
-  { name: "Gluten-Free", color: "#0d9488" },
-  { name: "Dairy-Free", color: "#0d9488" },
-  { name: "Keto / Low-Carb", color: "#8b5cf6" },
-  { name: "Fasting", color: "#78716c" },
-  { name: "High-Protein", color: "#3b82f6" },
-  { name: "Low-Calorie", color: "#06b6d4" },
-  // Effort & Time
-  { name: "Quick (< 30 min)", color: "#eab308" },
-  { name: "5 Ingredients or Less", color: "#22c55e" },
-  { name: "Meal Prep", color: "#3b82f6" },
-  { name: "Freezer-Friendly", color: "#06b6d4" },
-  { name: "Beginner-Friendly", color: "#ec4899" },
-  // Occasion
-  { name: "Weeknight Dinner", color: "#f97316" },
-  { name: "Holiday", color: "#ef4444" },
-  { name: "Comfort Food", color: "#ec4899" },
-  { name: "Lunchbox", color: "#eab308" },
+  // Time
+  { name: "Quick (≤20 min)", color: "#eab308", category: "Time" },
+  { name: "30-Min Meal",     color: "#f97316", category: "Time" },
+  { name: "1 Hour",          color: "#ef4444", category: "Time" },
+  { name: "Meal Prep",       color: "#3b82f6", category: "Time" },
+
+  // Method
+  { name: "One-Pot",          color: "#06b6d4", category: "Method" },
+  { name: "Pan-Fried",        color: "#f97316", category: "Method" },
+  { name: "Baked",            color: "#ef4444", category: "Method" },
+  { name: "Grilled",          color: "#ef4444", category: "Method" },
+  { name: "Air Fryer",        color: "#8b5cf6", category: "Method" },
+  { name: "Stir-Fry",         color: "#eab308", category: "Method" },
+  { name: "No-Cook",          color: "#22c55e", category: "Method" },
+  { name: "Pressure Cooker",  color: "#0d9488", category: "Method" },
+  { name: "BBQ",              color: "#ef4444", category: "Method" },
+
+  // Diet / Nutrition
+  { name: "High-Protein",  color: "#3b82f6", category: "Diet / Nutrition" },
+  { name: "Vegetarian",    color: "#22c55e", category: "Diet / Nutrition" },
+  { name: "Vegan",         color: "#22c55e", category: "Diet / Nutrition" },
+  { name: "Healthy",       color: "#0d9488", category: "Diet / Nutrition" },
+  { name: "Comfort Food",  color: "#ec4899", category: "Diet / Nutrition" },
+
   // Cuisine
-  { name: "Greek", color: "#3b82f6" },
-  { name: "Italian", color: "#22c55e" },
-  { name: "Mexican", color: "#ef4444" },
-  { name: "Asian", color: "#f97316" },
-  { name: "Middle Eastern", color: "#eab308" },
-  { name: "Mediterranean", color: "#06b6d4" },
-  { name: "French", color: "#8b5cf6" },
-  { name: "American", color: "#3b82f6" },
+  { name: "Italian",        color: "#22c55e", category: "Cuisine" },
+  { name: "Asian",           color: "#f97316", category: "Cuisine" },
+  { name: "Mexican",         color: "#ef4444", category: "Cuisine" },
+  { name: "Mediterranean",   color: "#06b6d4", category: "Cuisine" },
+  { name: "Greek",           color: "#3b82f6", category: "Cuisine" },
+  { name: "Indian",          color: "#eab308", category: "Cuisine" },
+  { name: "Middle Eastern",  color: "#8b5cf6", category: "Cuisine" },
+  { name: "American",        color: "#3b82f6", category: "Cuisine" },
+
+  // Occasion
+  { name: "Breakfast",     color: "#f97316", category: "Occasion" },
+  { name: "Lunch",         color: "#eab308", category: "Occasion" },
+  { name: "Dinner",        color: "#ef4444", category: "Occasion" },
+  { name: "Snack",         color: "#22c55e", category: "Occasion" },
+  { name: "Brunch",        color: "#ec4899", category: "Occasion" },
+  { name: "Party",         color: "#8b5cf6", category: "Occasion" },
+  { name: "Kid-Friendly",  color: "#06b6d4", category: "Occasion" },
+
+  // Flavor
+  { name: "Spicy",   color: "#ef4444", category: "Flavor" },
+  { name: "Sweet",   color: "#ec4899", category: "Flavor" },
+  { name: "Savory",  color: "#f97316", category: "Flavor" },
+
+  // Other
+  { name: "Favorites",       color: "#eab308", category: "Other" },
+  { name: "To Try",          color: "#3b82f6", category: "Other" },
+  { name: "Guest Favorite",  color: "#8b5cf6", category: "Other" },
+  { name: "Kid Approved",    color: "#06b6d4", category: "Other" },
+  { name: "Kids",            color: "#22c55e", category: "Other" },
+  { name: "Quick N' Easy",   color: "#eab308", category: "Other" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -129,11 +145,51 @@ async function seedCollection(colName, items, fields) {
   console.log(`  ✓ ${colName}: created ${toCreate.length} entries`);
 }
 
+/**
+ * Back-fill the `category` field on existing tag documents that are missing it.
+ * Matches by name against DEFAULT_TAGS; unmatched docs get "Other".
+ */
+async function backfillTagCategories() {
+  const col = db.collection("tags");
+  const snap = await col.get();
+  const nameToCategory = new Map(DEFAULT_TAGS.map((t) => [t.name, t.category]));
+  const toUpdate = [];
+
+  for (const d of snap.docs) {
+    const data = d.data();
+    if (data.category) continue;
+    const category = nameToCategory.get(data.name) ?? "Other";
+    toUpdate.push({ ref: d.ref, category });
+  }
+
+  if (toUpdate.length === 0) {
+    console.log("  ✓ tags: all documents already have a category");
+    return;
+  }
+
+  console.log(`  → tags: back-filling category on ${toUpdate.length} documents`);
+
+  if (dryRun) {
+    for (const { ref, category } of toUpdate) {
+      console.log(`    [DRY] ${ref.id} → ${category}`);
+    }
+    return;
+  }
+
+  const batch = db.batch();
+  for (const { ref, category } of toUpdate) {
+    batch.update(ref, { category });
+  }
+  await batch.commit();
+  console.log(`  ✓ tags: back-filled ${toUpdate.length} documents`);
+}
+
 async function main() {
   console.log(`\nSeeding Firestore${dryRun ? " (DRY RUN)" : ""}...\n`);
 
   await seedCollection("categories", DEFAULT_CATEGORIES, ["name", "icon", "description"]);
-  await seedCollection("tags", DEFAULT_TAGS, ["name", "color"]);
+  await seedCollection("tags", DEFAULT_TAGS, ["name", "color", "category"]);
+  await backfillTagCategories();
 
   console.log("\nDone.\n");
 }

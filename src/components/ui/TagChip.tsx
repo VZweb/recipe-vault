@@ -39,7 +39,7 @@ export function TagChip({
         backgroundColor: `${color}18`,
         color: color,
         borderColor: color,
-        ...(selected ? { ringColor: color } : {}),
+        ...(selected ? { ["--tw-ring-color" as string]: color } : {}),
       }}
     >
       {name}

@@ -237,7 +237,9 @@ export function RecipeDetailPage() {
               </Link>
             )}
             {recipeTags.map((tag) => (
-              <TagChip key={tag.id} name={tag.name} color={tag.color} />
+              <Link key={tag.id} to={`/recipes?tag=${tag.id}`}>
+                <TagChip name={tag.name} color={tag.color} />
+              </Link>
             ))}
           </div>
         )}

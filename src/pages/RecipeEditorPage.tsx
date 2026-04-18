@@ -16,6 +16,7 @@ import { CategoryIcon } from "@/components/ui/CategoryIcon";
 import { Spinner } from "@/components/ui/Spinner";
 import { IngredientAutocomplete } from "@/components/ui/IngredientAutocomplete";
 import { IngredientQuickAdd } from "@/components/ui/IngredientQuickAdd";
+import { TAG_CATEGORIES } from "@/types/tag";
 import type { Ingredient, Step, RecipeFormData } from "@/types/recipe";
 
 function emptyIngredient(sortOrder: number): Ingredient {
@@ -69,6 +70,7 @@ export function RecipeEditorPage() {
   const [quickAddIdx, setQuickAddIdx] = useState<number | null>(null);
   const [pasteReview, setPasteReview] = useState<Ingredient[] | null>(null);
   const [pasteReviewQuickAddIdx, setPasteReviewQuickAddIdx] = useState<number | null>(null);
+  const [activeTagCategory, setActiveTagCategory] = useState<string | null>(null);
 
   useEffect(() => {
     if (recipe && isEditing) {
@@ -499,27 +501,31 @@ export function RecipeEditorPage() {
       <section className="space-y-4 rounded-xl border border-stone-200 bg-white p-6">
         <h2 className="text-lg font-semibold text-stone-800">Category</h2>
         {categories.length > 0 ? (
-          <div className="flex flex-wrap gap-2">
-            {categories.map((cat) => (
+          <div className="flex items-center gap-3">
+            <select
+              value={form.categoryId ?? ""}
+              onChange={(e) =>
+                setField("categoryId", e.target.value || null)
+              }
+              className="flex-1 rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-700 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-colors"
+            >
+              <option value="">No category</option>
+              {categories.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.name}
+                </option>
+              ))}
+            </select>
+            {form.categoryId && (
               <button
-                key={cat.id}
                 type="button"
-                onClick={() =>
-                  setField(
-                    "categoryId",
-                    form.categoryId === cat.id ? null : cat.id
-                  )
-                }
-                className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-all border ${
-                  form.categoryId === cat.id
-                    ? "border-brand-400 bg-brand-50 text-brand-700 ring-2 ring-brand-400/30"
-                    : "border-stone-200 bg-white text-stone-600 hover:border-stone-300 hover:bg-stone-50"
-                }`}
+                onClick={() => setField("categoryId", null)}
+                className="p-1.5 text-stone-400 hover:text-stone-600 transition-colors"
+                aria-label="Clear category"
               >
-                <CategoryIcon icon={cat.icon} size={16} />
-                {cat.name}
+                <X size={16} />
               </button>
-            ))}
+            )}
           </div>
         ) : (
           <p className="text-sm text-stone-500">
@@ -533,20 +539,80 @@ export function RecipeEditorPage() {
       </section>
 
       {/* Tags */}
-      <section className="space-y-4 rounded-xl border border-stone-200 bg-white p-6">
+      <section className="space-y-3 rounded-xl border border-stone-200 bg-white p-6">
         <h2 className="text-lg font-semibold text-stone-800">Tags</h2>
+
         {tags.length > 0 ? (
-          <div className="flex flex-wrap gap-2">
-            {tags.map((tag) => (
-              <TagChip
-                key={tag.id}
-                name={tag.name}
-                color={tag.color}
-                selected={form.tags.includes(tag.id)}
-                onClick={() => toggleTag(tag.id)}
-              />
-            ))}
-          </div>
+          <>
+            {/* Selected tags */}
+            {form.tags.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {form.tags.map((id) => {
+                  const tag = tags.find((t) => t.id === id);
+                  if (!tag) return null;
+                  return (
+                    <TagChip
+                      key={id}
+                      name={tag.name}
+                      color={tag.color}
+                      selected
+                      onRemove={() => toggleTag(id)}
+                    />
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Category tabs */}
+            <div className="flex flex-wrap gap-1.5">
+              {TAG_CATEGORIES.map((cat) => {
+                const catTags = tags.filter((t) => t.category === cat);
+                if (catTags.length === 0) return null;
+                const isActive = activeTagCategory === cat;
+                const selectedCount = catTags.filter((t) =>
+                  form.tags.includes(t.id)
+                ).length;
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() =>
+                      setActiveTagCategory(isActive ? null : cat)
+                    }
+                    className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
+                      isActive
+                        ? "bg-brand-100 text-brand-700 ring-1 ring-brand-300"
+                        : "bg-stone-100 text-stone-600 hover:bg-stone-200"
+                    }`}
+                  >
+                    {cat}
+                    {selectedCount > 0 && (
+                      <span className="flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-brand-600 px-1 text-[10px] font-bold text-white">
+                        {selectedCount}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Tags for active category */}
+            {activeTagCategory && (
+              <div className="flex flex-wrap gap-2 rounded-lg border border-stone-100 bg-stone-50 p-3">
+                {tags
+                  .filter((t) => t.category === activeTagCategory)
+                  .map((tag) => (
+                    <TagChip
+                      key={tag.id}
+                      name={tag.name}
+                      color={tag.color}
+                      selected={form.tags.includes(tag.id)}
+                      onClick={() => toggleTag(tag.id)}
+                    />
+                  ))}
+              </div>
+            )}
+          </>
         ) : (
           <p className="text-sm text-stone-500">
             No tags yet.{" "}
