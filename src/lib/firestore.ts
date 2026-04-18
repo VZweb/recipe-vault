@@ -55,6 +55,7 @@ function docToRecipe(id: string, data: DocumentData): Recipe {
       isSection: (ing.isSection as boolean) ?? false,
     })),
     steps: data.steps ?? [],
+    notes: data.notes ?? "",
     cookedCount: data.cookedCount ?? 0,
     createdAt: toDate(data.createdAt),
     updatedAt: toDate(data.updatedAt),

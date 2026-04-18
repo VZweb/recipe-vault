@@ -29,6 +29,7 @@ export interface Recipe {
   tags: string[];
   ingredients: Ingredient[];
   steps: Step[];
+  notes: string;
   cookedCount: number;
   createdAt: Date;
   updatedAt: Date;

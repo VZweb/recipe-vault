@@ -110,6 +110,7 @@ export function RecipeDetailPage() {
       tags: recipe.tags,
       ingredients: recipe.ingredients,
       steps: recipe.steps,
+      notes: recipe.notes,
     });
     navigate(`/recipes/${newId}`);
   };
@@ -271,6 +272,16 @@ export function RecipeDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Notes */}
+      {recipe.notes && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-5">
+          <h2 className="text-lg font-semibold text-stone-800 mb-2">Notes</h2>
+          <p className="text-sm text-stone-700 leading-relaxed whitespace-pre-line">
+            {recipe.notes}
+          </p>
+        </div>
+      )}
 
       {/* Ingredients + Steps */}
       <div className="grid gap-8 lg:grid-cols-[1fr_2fr]">

@@ -44,6 +44,7 @@ const defaultForm: RecipeFormData = {
   tags: [],
   ingredients: [emptyIngredient(0)],
   steps: [emptyStep(0)],
+  notes: "",
 };
 
 export function RecipeEditorPage() {
@@ -90,6 +91,7 @@ export function RecipeEditorPage() {
             ? recipe.ingredients
             : [emptyIngredient(0)],
         steps: recipe.steps.length > 0 ? recipe.steps : [emptyStep(0)],
+        notes: recipe.notes,
       });
       setPreviewImages(recipe.imageUrls);
       const ings = recipe.ingredients.length > 0 ? recipe.ingredients : [];
@@ -990,6 +992,17 @@ export function RecipeEditorPage() {
             </div>
           </div>
         )}
+      </section>
+
+      {/* Notes */}
+      <section className="space-y-4 rounded-xl border border-stone-200 bg-white p-6">
+        <h2 className="text-lg font-semibold text-stone-800">Notes</h2>
+        <Textarea
+          placeholder="Personal notes, tips, variations, substitutions…"
+          value={form.notes}
+          onChange={(e) => setField("notes", e.target.value)}
+          rows={4}
+        />
       </section>
 
       {/* Submit bar (sticky on mobile) */}
