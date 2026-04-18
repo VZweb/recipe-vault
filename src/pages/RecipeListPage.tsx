@@ -310,7 +310,7 @@ export function RecipeListPage() {
           <Spinner className="h-8 w-8" />
         </div>
       ) : filteredAndSorted.length > 0 ? (
-        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-3 grid-cols-2 lg:grid-cols-3 sm:gap-4">
           {filteredAndSorted.map((recipe) => (
             <RecipeCard key={recipe.id} recipe={recipe} tags={tags} categories={categories} />
           ))}

@@ -53,19 +53,19 @@ export function RecipeCard({ recipe, tags, categories = [] }: RecipeCardProps) {
       </div>
 
       {/* Content */}
-      <div className="flex flex-1 flex-col p-4">
-        <h3 className="font-semibold text-stone-900 group-hover:text-brand-700 transition-colors line-clamp-1">
+      <div className="flex flex-1 flex-col p-3 sm:p-4">
+        <h3 className="text-sm sm:text-base font-semibold text-stone-900 group-hover:text-brand-700 transition-colors line-clamp-2 sm:line-clamp-1">
           {recipe.title}
         </h3>
         {recipe.description && (
-          <p className="mt-1 text-sm text-stone-500 line-clamp-2">
+          <p className="mt-1 text-xs sm:text-sm text-stone-500 line-clamp-1 hidden sm:block">
             {recipe.description}
           </p>
         )}
 
         {/* Category + Tags */}
         {(category || recipeTags.length > 0) && (
-          <div className="mt-3 flex flex-wrap gap-1.5">
+          <div className="mt-2 sm:mt-3 flex flex-wrap gap-1.5">
             {category && (
               <button
                 type="button"
@@ -77,22 +77,32 @@ export function RecipeCard({ recipe, tags, categories = [] }: RecipeCardProps) {
                 className="inline-flex items-center gap-1 rounded-full border border-brand-200 bg-brand-50 px-2 py-0.5 text-[11px] font-medium text-brand-700 hover:bg-brand-100 hover:border-brand-300 transition-colors"
               >
                 <CategoryIcon icon={category.icon} size={12} />
-                {category.name}
+                <span className="hidden sm:inline">{category.name}</span>
               </button>
             )}
-            {recipeTags.slice(0, 3).map((tag) => (
+            {recipeTags.slice(0, 2).map((tag) => (
               <TagChip key={tag.id} name={tag.name} color={tag.color} />
             ))}
+            <span className="hidden sm:contents">
+              {recipeTags.slice(2, 3).map((tag) => (
+                <TagChip key={tag.id} name={tag.name} color={tag.color} />
+              ))}
+            </span>
             {recipeTags.length > 3 && (
               <span className="text-xs text-stone-400">
                 +{recipeTags.length - 3}
+              </span>
+            )}
+            {recipeTags.length === 3 && (
+              <span className="sm:hidden text-xs text-stone-400">
+                +1
               </span>
             )}
           </div>
         )}
 
         {/* Meta */}
-        <div className="mt-auto flex items-center gap-4 pt-3 text-xs text-stone-400">
+        <div className="mt-auto flex items-center gap-2 sm:gap-4 pt-2 sm:pt-3 text-[11px] sm:text-xs text-stone-400">
           {totalTime && (
             <span className="flex items-center gap-1">
               <Clock size={14} />
