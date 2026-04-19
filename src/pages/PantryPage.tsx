@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Camera,
-  Check,
   ChevronDown,
   ChevronRight,
+  ChevronUp,
   ChevronsDownUp,
   ChevronsUpDown,
-  ClipboardCopy,
   ImagePlus,
   Link,
   Link2,
@@ -79,10 +78,11 @@ export function PantryPage() {
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editState, setEditState] = useState<EditState | null>(null);
   const [saving, setSaving] = useState(false);
-  const [copied, setCopied] = useState(false);
+  
   const [clearNonStaplesConfirm, setClearNonStaplesConfirm] = useState(false);
   const [clearEverythingConfirm, setClearEverythingConfirm] = useState(false);
   const [clearing, setClearing] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -375,54 +375,6 @@ export function PantryPage() {
     setCollapsedCategories(new Set());
   };
 
-  const buildRecipePrompt = useCallback(() => {
-    const staples = items.filter((i) => i.isStaple);
-    const regular = items.filter((i) => !i.isStaple);
-
-    const formatItem = (item: PantryItem) => {
-      let s = item.name;
-      if (item.quantity != null || item.unit) {
-        const parts = [item.quantity?.toString(), item.unit].filter(Boolean).join(" ");
-        s += ` (${parts})`;
-      }
-      return s;
-    };
-
-    const byCategory = PANTRY_CATEGORIES.reduce((acc, cat) => {
-      const catItems = regular.filter((i) => i.category === cat);
-      if (catItems.length > 0) acc[cat] = catItems;
-      return acc;
-    }, {} as Record<string, PantryItem[]>);
-
-    const lines: string[] = [
-      "I have the following ingredients in my pantry:",
-      "",
-    ];
-
-    for (const [cat, catItems] of Object.entries(byCategory)) {
-      lines.push(`${cat}: ${catItems.map(formatItem).join(", ")}`);
-    }
-
-    if (staples.length > 0) {
-      lines.push("");
-      lines.push(
-        `Staples (always available): ${staples.map(formatItem).join(", ")}`
-      );
-    }
-
-    lines.push("");
-    lines.push("Suggest 1 recipe I can make with these ingredients.");
-
-    return lines.join("\n");
-  }, [items]);
-
-  const handleCopyPrompt = async () => {
-    const prompt = buildRecipePrompt();
-    await navigator.clipboard.writeText(prompt);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
   const aliasMap = useMemo(() => {
     const map = new Map<string, string[]>();
     for (const mi of masterIngredients) {
@@ -495,311 +447,342 @@ export function PantryPage() {
         </div>
       )}
 
-      {/* Quick add form */}
-      <form
-        onSubmit={handleAdd}
-        className="space-y-3 rounded-xl border border-stone-200 bg-white p-4"
-      >
-        {/* Row 1: Name + Greek name */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="flex-1">
-            <IngredientAutocomplete
-              ingredients={masterIngredients}
-              value={newName}
-              placeholder="Item name (e.g., chicken breast, olive oil...)"
-              className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-colors"
-              onChange={(v) => {
-                setNewName(v);
-                setNewMasterIngredientId(null);
-                setQuickAddName(null);
-              }}
-              onSelect={(mi) => {
-                setNewName(mi.name);
-                setNewNameSecondary(mi.nameGr);
-                setNewMasterIngredientId(mi.id);
-                setQuickAddName(null);
-                if (mi.category) {
-                  const pantryMatch = PANTRY_CATEGORIES.find(
-                    (c) => c === mi.category
-                  );
-                  if (pantryMatch) setNewCategory(pantryMatch);
-                }
-              }}
-              onCreateNew={(name) => setQuickAddName(name)}
-            />
+      {/* Add new ingredient */}
+      <div className="rounded-xl border border-stone-200 bg-white shadow-sm overflow-hidden">
+        <button
+          type="button"
+          onClick={() => setShowAddForm((v) => !v)}
+          className="flex w-full items-center justify-between px-5 py-3.5 hover:bg-stone-50 transition-colors"
+        >
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-100 text-brand-600">
+              <Plus size={18} />
+            </span>
+            <span className="text-sm font-semibold text-stone-800">Add ingredient to pantry</span>
           </div>
-          <div className="flex-1">
-            <Input
-              placeholder="Greek name (optional)"
-              value={newNameSecondary}
-              onChange={(e) => setNewNameSecondary(e.target.value)}
-              readOnly={!!newMasterIngredientId}
-            />
-          </div>
-        </div>
-
-        {/* Quick-add to catalog — then auto-add to pantry */}
-        {quickAddName && !newMasterIngredientId && (
-          <IngredientQuickAdd
-            initialName={quickAddName}
-            ingredients={masterIngredients}
-            onCreate={addCatalogIngredient}
-            onCreated={async (mi) => {
-              setQuickAddName(null);
-
-              const pantryCategory = PANTRY_CATEGORIES.find((c) => c === mi.category) ?? newCategory;
-              const qty = newQuantity ? Number(newQuantity) : null;
-              const unit = newUnit || null;
-
-              const existing = findDuplicate(mi.name, mi.id);
-              if (existing) {
-                setNewName(mi.name);
-                setNewNameSecondary(mi.nameGr);
-                setNewMasterIngredientId(mi.id);
-                setNewCategory(pantryCategory);
-                setDuplicateMatch(existing);
-                return;
-              }
-
-              setSubmitting(true);
-              try {
-                const id = await addPantryItem({
-                  name: mi.name,
-                  nameSecondary: mi.nameGr || null,
-                  normalizedName: mi.name.toLowerCase(),
-                  category: pantryCategory,
-                  quantity: qty,
-                  unit,
-                  isStaple: newIsStaple,
-                  imageUrl: null,
-                  masterIngredientId: mi.id,
-                  note: newNote.trim(),
-                });
-
-                setItems((prev) => [
-                  ...prev,
-                  {
-                    id,
-                    name: mi.name,
-                    nameSecondary: mi.nameGr || null,
-                    normalizedName: mi.name.toLowerCase(),
-                    category: pantryCategory,
-                    quantity: qty,
-                    unit,
-                    isStaple: newIsStaple,
-                    imageUrl: null,
-                    masterIngredientId: mi.id,
-                    note: newNote.trim(),
-                    addedAt: new Date(),
-                  },
-                ]);
-
-                setNewName("");
-                setNewNameSecondary("");
-                setNewQuantity("");
-                setNewUnit("");
-                setNewIsStaple(false);
-                setNewMasterIngredientId(null);
-                setNewNote("");
-                clearImageSelection();
-              } finally {
-                setSubmitting(false);
-              }
-            }}
-            onCancel={() => setQuickAddName(null)}
-          />
-        )}
-
-        {/* Row 2: Category, Quantity, Unit */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          <select
-            value={newCategory}
-            onChange={(e) =>
-              setNewCategory(e.target.value as PantryCategory)
-            }
-            className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-700 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-          >
-            {PANTRY_CATEGORIES.map((cat) => (
-              <option key={cat} value={cat}>
-                {cat}
-              </option>
-            ))}
-          </select>
-
-          <input
-            type="number"
-            min="0"
-            step="any"
-            placeholder="Qty"
-            value={newQuantity}
-            onChange={(e) => setNewQuantity(e.target.value)}
-            className="w-20 rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-700 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-          />
-
-          <select
-            value={newUnit}
-            onChange={(e) => setNewUnit(e.target.value)}
-            className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-700 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-          >
-            <option value="">Unit</option>
-            {PANTRY_UNITS.map((u) => (
-              <option key={u} value={u}>
-                {u}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Row 3: Staple + Photo + Submit */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-          <label className="flex items-center gap-2 text-sm text-stone-600 whitespace-nowrap">
-            <input
-              type="checkbox"
-              checked={newIsStaple}
-              onChange={(e) => setNewIsStaple(e.target.checked)}
-              className="h-4 w-4 rounded border-stone-300 text-brand-600 focus:ring-brand-500"
-            />
-            Staple
-          </label>
-
-          {/* Photo buttons */}
-          <div className="flex items-center gap-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) handleImageSelected(file);
-              }}
-            />
-            <input
-              ref={cameraInputRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) handleImageSelected(file);
-              }}
-            />
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-1.5 rounded-lg border border-stone-300 px-3 py-2 text-sm text-stone-600 hover:bg-stone-50 transition-colors"
-              title="Choose photo"
-            >
-              <ImagePlus size={16} />
-              Photo
-            </button>
-            <button
-              type="button"
-              onClick={() => cameraInputRef.current?.click()}
-              className="flex items-center gap-1.5 rounded-lg border border-stone-300 px-3 py-2 text-sm text-stone-600 hover:bg-stone-50 transition-colors"
-              title="Take photo with camera"
-            >
-              <Camera size={16} />
-              Camera
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowNewImageUrlInput((v) => !v)}
-              className="flex items-center gap-1.5 rounded-lg border border-stone-300 px-3 py-2 text-sm text-stone-600 hover:bg-stone-50 transition-colors"
-              title="Add image from URL"
-            >
-              <Link size={16} />
-              URL
-            </button>
-          </div>
-
-          {/* Image preview */}
-          {(newImagePreview || newImageUrl.trim()) && (
-            <div className="relative">
-              <img
-                src={newImagePreview ?? newImageUrl.trim()}
-                alt="Preview"
-                className="h-12 w-12 rounded-lg object-cover border border-stone-200"
-              />
-              <button
-                type="button"
-                onClick={clearImageSelection}
-                className="absolute -top-1.5 -right-1.5 rounded-full bg-stone-700 p-0.5 text-white hover:bg-red-500 transition-colors"
-              >
-                <X size={12} />
-              </button>
-            </div>
+          {showAddForm ? (
+            <ChevronUp size={18} className="text-stone-400" />
+          ) : (
+            <ChevronDown size={18} className="text-stone-400" />
           )}
+        </button>
 
-          <div className="sm:ml-auto flex items-center gap-2">
-            {newName.trim() && !newMasterIngredientId && (
-              <span className="text-xs text-amber-600">Select from catalog or create new</span>
+        {showAddForm && (
+          <form
+            onSubmit={handleAdd}
+            className="space-y-5 border-t border-stone-100 px-5 pb-5 pt-4"
+          >
+            {/* Ingredient name */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium uppercase tracking-wider text-stone-500">Ingredient</label>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="flex-1">
+                  <IngredientAutocomplete
+                    ingredients={masterIngredients}
+                    value={newName}
+                    placeholder="Start typing (e.g. chicken breast, olive oil...)"
+                    className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-colors"
+                    onChange={(v) => {
+                      setNewName(v);
+                      setNewMasterIngredientId(null);
+                      setQuickAddName(null);
+                    }}
+                    onSelect={(mi) => {
+                      setNewName(mi.name);
+                      setNewNameSecondary(mi.nameGr);
+                      setNewMasterIngredientId(mi.id);
+                      setQuickAddName(null);
+                      if (mi.category) {
+                        const pantryMatch = PANTRY_CATEGORIES.find(
+                          (c) => c === mi.category
+                        );
+                        if (pantryMatch) setNewCategory(pantryMatch);
+                      }
+                    }}
+                    onCreateNew={(name) => setQuickAddName(name)}
+                  />
+                  {newName.trim() && !newMasterIngredientId && (
+                    <p className="mt-1 text-xs text-amber-600">Select from catalog or create new</p>
+                  )}
+                </div>
+                <div className="flex-1">
+                  <Input
+                    placeholder="Greek name (optional)"
+                    value={newNameSecondary}
+                    onChange={(e) => setNewNameSecondary(e.target.value)}
+                    readOnly={!!newMasterIngredientId}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Quick-add to catalog */}
+            {quickAddName && !newMasterIngredientId && (
+              <IngredientQuickAdd
+                initialName={quickAddName}
+                ingredients={masterIngredients}
+                onCreate={addCatalogIngredient}
+                onCreated={async (mi) => {
+                  setQuickAddName(null);
+
+                  const pantryCategory = PANTRY_CATEGORIES.find((c) => c === mi.category) ?? newCategory;
+                  const qty = newQuantity ? Number(newQuantity) : null;
+                  const unit = newUnit || null;
+
+                  const existing = findDuplicate(mi.name, mi.id);
+                  if (existing) {
+                    setNewName(mi.name);
+                    setNewNameSecondary(mi.nameGr);
+                    setNewMasterIngredientId(mi.id);
+                    setNewCategory(pantryCategory);
+                    setDuplicateMatch(existing);
+                    return;
+                  }
+
+                  setSubmitting(true);
+                  try {
+                    const id = await addPantryItem({
+                      name: mi.name,
+                      nameSecondary: mi.nameGr || null,
+                      normalizedName: mi.name.toLowerCase(),
+                      category: pantryCategory,
+                      quantity: qty,
+                      unit,
+                      isStaple: newIsStaple,
+                      imageUrl: null,
+                      masterIngredientId: mi.id,
+                      note: newNote.trim(),
+                    });
+
+                    setItems((prev) => [
+                      ...prev,
+                      {
+                        id,
+                        name: mi.name,
+                        nameSecondary: mi.nameGr || null,
+                        normalizedName: mi.name.toLowerCase(),
+                        category: pantryCategory,
+                        quantity: qty,
+                        unit,
+                        isStaple: newIsStaple,
+                        imageUrl: null,
+                        masterIngredientId: mi.id,
+                        note: newNote.trim(),
+                        addedAt: new Date(),
+                      },
+                    ]);
+
+                    setNewName("");
+                    setNewNameSecondary("");
+                    setNewQuantity("");
+                    setNewUnit("");
+                    setNewIsStaple(false);
+                    setNewMasterIngredientId(null);
+                    setNewNote("");
+                    clearImageSelection();
+                  } finally {
+                    setSubmitting(false);
+                  }
+                }}
+                onCancel={() => setQuickAddName(null)}
+              />
             )}
-            <Button type="submit" disabled={!newName.trim() || !newMasterIngredientId || submitting}>
-              {submitting ? (
-                <Spinner className="h-4 w-4" />
-              ) : (
-                <Plus size={16} />
+
+            {/* Category, Quantity, Unit */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium uppercase tracking-wider text-stone-500">Details</label>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <select
+                  value={newCategory}
+                  onChange={(e) =>
+                    setNewCategory(e.target.value as PantryCategory)
+                  }
+                  className="flex-1 rounded-lg border border-stone-300 bg-white px-3 py-2.5 text-sm text-stone-700 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                >
+                  {PANTRY_CATEGORIES.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    placeholder="Qty"
+                    value={newQuantity}
+                    onChange={(e) => setNewQuantity(e.target.value)}
+                    className="w-20 rounded-lg border border-stone-300 bg-white px-3 py-2.5 text-sm text-stone-700 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                  />
+
+                  <select
+                    value={newUnit}
+                    onChange={(e) => setNewUnit(e.target.value)}
+                    className="rounded-lg border border-stone-300 bg-white px-3 py-2.5 text-sm text-stone-700 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                  >
+                    <option value="">Unit</option>
+                    {PANTRY_UNITS.map((u) => (
+                      <option key={u} value={u}>
+                        {u}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <label className="flex items-center gap-2 text-sm text-stone-600 whitespace-nowrap sm:pl-2">
+                  <input
+                    type="checkbox"
+                    checked={newIsStaple}
+                    onChange={(e) => setNewIsStaple(e.target.checked)}
+                    className="h-4 w-4 rounded border-stone-300 text-brand-600 focus:ring-brand-500"
+                  />
+                  Staple
+                </label>
+              </div>
+            </div>
+
+            {/* Note */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium uppercase tracking-wider text-stone-500">Note</label>
+              <input
+                type="text"
+                placeholder="Brand, source, or any extra info..."
+                value={newNote}
+                onChange={(e) => setNewNote(e.target.value)}
+                className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2.5 text-sm text-stone-700 placeholder:text-stone-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-colors"
+              />
+            </div>
+
+            {/* Photo */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium uppercase tracking-wider text-stone-500">Photo</label>
+              <div className="flex items-center gap-2 flex-wrap">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleImageSelected(file);
+                  }}
+                />
+                <input
+                  ref={cameraInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleImageSelected(file);
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center gap-1.5 rounded-lg border border-stone-300 px-3 py-2 text-sm text-stone-600 hover:bg-stone-50 transition-colors"
+                  title="Choose photo"
+                >
+                  <ImagePlus size={16} />
+                  Photo
+                </button>
+                <button
+                  type="button"
+                  onClick={() => cameraInputRef.current?.click()}
+                  className="flex items-center gap-1.5 rounded-lg border border-stone-300 px-3 py-2 text-sm text-stone-600 hover:bg-stone-50 transition-colors"
+                  title="Take photo with camera"
+                >
+                  <Camera size={16} />
+                  Camera
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowNewImageUrlInput((v) => !v)}
+                  className="flex items-center gap-1.5 rounded-lg border border-stone-300 px-3 py-2 text-sm text-stone-600 hover:bg-stone-50 transition-colors"
+                  title="Add image from URL"
+                >
+                  <Link size={16} />
+                  URL
+                </button>
+
+                {(newImagePreview || newImageUrl.trim()) && (
+                  <div className="relative">
+                    <img
+                      src={newImagePreview ?? newImageUrl.trim()}
+                      alt="Preview"
+                      className="h-12 w-12 rounded-lg object-cover border border-stone-200"
+                    />
+                    <button
+                      type="button"
+                      onClick={clearImageSelection}
+                      className="absolute -top-1.5 -right-1.5 rounded-full bg-stone-700 p-0.5 text-white hover:bg-red-500 transition-colors"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {showNewImageUrlInput && (
+                <input
+                  type="url"
+                  placeholder="Paste image URL (https://...)"
+                  value={newImageUrl}
+                  onChange={(e) => {
+                    setNewImageUrl(e.target.value);
+                    if (newImageFile) {
+                      setNewImageFile(null);
+                      if (newImagePreview) URL.revokeObjectURL(newImagePreview);
+                      setNewImagePreview(null);
+                    }
+                  }}
+                  className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-colors"
+                  autoFocus
+                />
               )}
-              {submitting ? "Adding..." : "Add"}
-            </Button>
-          </div>
-        </div>
+            </div>
 
-        {/* Note */}
-        <input
-          type="text"
-          placeholder="Note (brand, source, etc.)"
-          value={newNote}
-          onChange={(e) => setNewNote(e.target.value)}
-          className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-700 placeholder:text-stone-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-colors"
-        />
-
-        {/* Image URL input */}
-        {showNewImageUrlInput && (
-          <div className="flex gap-2">
-            <input
-              type="url"
-              placeholder="Paste image URL (https://...)"
-              value={newImageUrl}
-              onChange={(e) => {
-                setNewImageUrl(e.target.value);
-                if (newImageFile) {
-                  setNewImageFile(null);
-                  if (newImagePreview) URL.revokeObjectURL(newImagePreview);
-                  setNewImagePreview(null);
-                }
-              }}
-              className="flex-1 rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-colors"
-              autoFocus
-            />
-          </div>
+            {/* Submit */}
+            <div className="flex items-center justify-end gap-3 pt-1 border-t border-stone-100">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => {
+                  setNewName("");
+                  setNewNameSecondary("");
+                  setNewQuantity("");
+                  setNewUnit("");
+                  setNewIsStaple(false);
+                  setNewMasterIngredientId(null);
+                  setNewNote("");
+                  clearImageSelection();
+                  setQuickAddName(null);
+                }}
+                disabled={submitting}
+              >
+                Reset
+              </Button>
+              <Button type="submit" disabled={!newName.trim() || !newMasterIngredientId || submitting}>
+                {submitting ? (
+                  <Spinner className="h-4 w-4" />
+                ) : (
+                  <Plus size={16} />
+                )}
+                {submitting ? "Adding..." : "Add to pantry"}
+              </Button>
+            </div>
+          </form>
         )}
-      </form>
+      </div>
 
       {/* Grouped list */}
       {categoryKeys.length > 0 ? (
         <div className="space-y-4">
           {/* Actions bar */}
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <button
-              onClick={handleCopyPrompt}
-              className="flex items-center gap-1.5 rounded-lg bg-stone-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-stone-700 transition-colors"
-              title="Copy a ChatGPT prompt with all your pantry items"
-            >
-              {copied ? (
-                <>
-                  <Check size={14} className="text-emerald-500" />
-                  <span className="text-emerald-600">Copied!</span>
-                </>
-              ) : (
-                <>
-                  <ClipboardCopy size={14} />
-                  Ask ChatGPT for a recipe
-                </>
-              )}
-            </button>
+          <div className="flex items-center justify-end gap-2 flex-wrap">
             <button
               onClick={allCollapsed ? expandAll : collapseAll}
               className="flex items-center gap-1.5 text-xs text-stone-500 hover:text-stone-700 transition-colors"

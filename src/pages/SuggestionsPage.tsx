@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ChefHat, Clock, Info, Link2, Percent, Users } from "lucide-react";
+import { Check, ChefHat, Clock, ClipboardCopy, Info, Link2, Percent, Users } from "lucide-react";
 import { useRecipes } from "@/hooks/useRecipes";
 import { useTags } from "@/hooks/useTags";
 import { useIngredients } from "@/hooks/useIngredients";
@@ -12,6 +12,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { IngredientAutocomplete } from "@/components/ui/IngredientAutocomplete";
 import type { PantryItem } from "@/types/pantry";
+import { PANTRY_CATEGORIES } from "@/types/pantry";
 
 interface ExtraIngredient {
   name: string;
@@ -32,6 +33,7 @@ export function SuggestionsPage() {
     nameSecondary: "",
     masterIngredientId: null,
   });
+  const [copied, setCopied] = useState(false);
 
   const loadPantry = useCallback(async () => {
     setLoadingPantry(true);
@@ -153,15 +155,91 @@ export function SuggestionsPage() {
     setPendingExtra({ name: "", nameSecondary: "", masterIngredientId: null });
   };
 
+  const buildRecipePrompt = useCallback(() => {
+    const staples = pantryItems.filter((i) => i.isStaple);
+    const regular = pantryItems.filter((i) => !i.isStaple);
+
+    const formatItem = (item: PantryItem) => {
+      let s = item.name;
+      if (item.quantity != null || item.unit) {
+        const parts = [item.quantity?.toString(), item.unit].filter(Boolean).join(" ");
+        s += ` (${parts})`;
+      }
+      return s;
+    };
+
+    const byCategory = PANTRY_CATEGORIES.reduce((acc, cat) => {
+      const catItems = regular.filter((i) => i.category === cat);
+      if (catItems.length > 0) acc[cat] = catItems;
+      return acc;
+    }, {} as Record<string, PantryItem[]>);
+
+    const lines: string[] = [
+      "I have the following ingredients in my pantry:",
+      "",
+    ];
+
+    for (const [cat, catItems] of Object.entries(byCategory)) {
+      lines.push(`${cat}: ${catItems.map(formatItem).join(", ")}`);
+    }
+
+    if (extraIngredients.length > 0) {
+      lines.push("");
+      lines.push(
+        `Extra ingredients I also have: ${extraIngredients.map((e) => e.name).join(", ")}`
+      );
+    }
+
+    if (staples.length > 0) {
+      lines.push("");
+      lines.push(
+        `Staples (always available): ${staples.map(formatItem).join(", ")}`
+      );
+    }
+
+    lines.push("");
+    lines.push("Suggest 1 recipe I can make with these ingredients.");
+
+    return lines.join("\n");
+  }, [pantryItems, extraIngredients]);
+
+  const handleCopyPrompt = async () => {
+    const prompt = buildRecipePrompt();
+    await navigator.clipboard.writeText(prompt);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   const loading = loadingRecipes || loadingPantry;
 
   return (
     <div className="space-y-6">
       <h1 className="font-heading text-2xl font-bold text-stone-800">What Can I Cook?</h1>
-      <p className="text-sm text-stone-500">
-        Based on your pantry ({pantryItems.length} items) and any extra
-        ingredients you add below.
-      </p>
+      <div className="flex items-center justify-between gap-4">
+        <p className="text-sm text-stone-500">
+          Based on your pantry ({pantryItems.length} items) and any extra
+          ingredients you add below.
+        </p>
+        {pantryItems.length > 0 && (
+          <button
+            onClick={handleCopyPrompt}
+            className="flex-shrink-0 flex items-center gap-1.5 rounded-lg bg-stone-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-stone-700 transition-colors"
+            title="Copy a ChatGPT prompt with all your pantry items"
+          >
+            {copied ? (
+              <>
+                <Check size={14} className="text-emerald-400" />
+                Copied!
+              </>
+            ) : (
+              <>
+                <ClipboardCopy size={14} />
+                Ask ChatGPT
+              </>
+            )}
+          </button>
+        )}
+      </div>
 
       {/* Extra ingredient input */}
       <form
