@@ -350,7 +350,7 @@ export function RecipeEditorPage() {
           <ArrowLeft size={16} />
           Back
         </button>
-        <h1 className="text-xl font-bold text-stone-800">
+        <h1 className="font-heading text-xl font-bold text-stone-800">
           {isEditing ? "Edit Recipe" : "New Recipe"}
         </h1>
         <Button type="submit" disabled={saving || !form.title.trim()}>

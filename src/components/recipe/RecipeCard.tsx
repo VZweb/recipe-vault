@@ -54,7 +54,7 @@ export function RecipeCard({ recipe, tags, categories = [] }: RecipeCardProps) {
 
       {/* Content */}
       <div className="flex flex-1 flex-col p-3 sm:p-4">
-        <h3 className="text-sm sm:text-base font-semibold text-stone-900 group-hover:text-brand-700 transition-colors line-clamp-2 sm:line-clamp-1">
+        <h3 className="font-heading text-sm sm:text-base font-semibold text-stone-900 group-hover:text-brand-700 transition-colors line-clamp-2 sm:line-clamp-1">
           {recipe.title}
         </h3>
         {recipe.description && (

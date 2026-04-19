@@ -149,7 +149,7 @@ export function SuggestionsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-stone-800">What Can I Cook?</h1>
+      <h1 className="font-heading text-2xl font-bold text-stone-800">What Can I Cook?</h1>
       <p className="text-sm text-stone-500">
         Based on your pantry ({pantryItems.length} items) and any extra
         ingredients you add below.
@@ -312,7 +312,7 @@ function SuggestionCard({
       {/* Content */}
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
-          <h3 className="font-semibold text-stone-900 line-clamp-2 sm:truncate">
+          <h3 className="font-heading font-semibold text-stone-900 line-clamp-2 sm:truncate">
             {s.recipe.title}
           </h3>
           <span

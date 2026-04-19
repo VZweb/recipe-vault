@@ -99,7 +99,7 @@ export function TagsPage({ embedded = false }: { embedded?: boolean } = {}) {
   return (
     <div className="space-y-6">
       {!embedded && (
-        <h1 className="text-2xl font-bold text-stone-800">Tags</h1>
+        <h1 className="font-heading text-2xl font-bold text-stone-800">Tags</h1>
       )}
 
       {/* Add form */}

@@ -18,7 +18,7 @@ export function HomePage() {
     <div className="space-y-10">
       {/* Hero */}
       <div className="rounded-2xl bg-gradient-to-br from-brand-600 to-brand-800 p-8 text-white">
-        <h1 className="text-3xl font-bold">Recipe Vault</h1>
+        <h1 className="font-heading text-3xl font-bold">Recipe Vault</h1>
         <p className="mt-2 text-brand-100 max-w-lg">
           Your personal recipe collection. Store, search, and discover what to
           cook with what you have.
@@ -79,7 +79,7 @@ export function HomePage() {
       {/* Recent recipes */}
       <section>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-stone-800">
+          <h2 className="font-heading text-xl font-semibold text-stone-800">
             Recent Recipes
           </h2>
           {recipes.length > 4 && (

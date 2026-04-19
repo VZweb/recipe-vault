@@ -36,7 +36,7 @@ export function AppLayout() {
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
           <NavLink to="/" className="flex items-center gap-2 font-bold text-brand-700">
             <ChefHat size={24} />
-            <span className="text-lg">Recipe Vault</span>
+            <span className="font-heading text-lg">Recipe Vault</span>
           </NavLink>
 
           {/* Desktop nav */}

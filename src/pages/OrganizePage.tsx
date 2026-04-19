@@ -21,7 +21,7 @@ export function OrganizePage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-stone-800">Organize</h1>
+      <h1 className="font-heading text-2xl font-bold text-stone-800">Organize</h1>
 
       <div className="flex gap-1 rounded-xl bg-stone-100 p-1">
         {tabs.map(({ key, label, icon: Icon }) => (

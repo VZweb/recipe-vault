@@ -195,7 +195,7 @@ export function CategoriesPage({ embedded = false }: { embedded?: boolean } = {}
 
   return (
     <div className="space-y-6">
-      {!embedded && <h1 className="text-2xl font-bold text-stone-800">Categories</h1>}
+      {!embedded && <h1 className="font-heading text-2xl font-bold text-stone-800">Categories</h1>}
 
       {/* Add form */}
       <form

@@ -456,7 +456,7 @@ export function PantryPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-stone-800">My Pantry</h1>
+      <h1 className="font-heading text-2xl font-bold text-stone-800">My Pantry</h1>
 
       {/* Search */}
       {items.length > 0 && (
