@@ -9,6 +9,7 @@ import {
   Edit,
   ExternalLink,
   Link2,
+  Package,
   Play,
   Trash2,
   Users,
@@ -359,18 +360,18 @@ export function RecipeDetailPage() {
                       )}
                     </span>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex flex-wrap items-center gap-x-1.5">
                         <span className={`text-sm font-medium ${checked ? "line-through text-stone-400" : "text-stone-800"}`}>
                           {ing.name}
                         </span>
-                        {ing.nameSecondary && (
-                          <span className="text-sm italic text-stone-400">
-                            ({ing.nameSecondary})
-                          </span>
-                        )}
                         {ing.masterIngredientId && (
                           <span className="inline-flex text-brand-400" title="From catalog">
                             <Link2 size={12} />
+                          </span>
+                        )}
+                        {ing.nameSecondary && (
+                          <span className="text-sm italic text-stone-400">
+                            ({ing.nameSecondary})
                           </span>
                         )}
                       </div>
@@ -381,9 +382,8 @@ export function RecipeDetailPage() {
                       )}
                     </div>
                     {inPantry && (
-                      <span className="flex-shrink-0 flex items-center gap-1 text-[10px] font-medium text-green-700 bg-green-100 rounded-full px-1.5 py-0.5 whitespace-nowrap">
-                        <Check size={10} />
-                        In pantry
+                      <span className="flex-shrink-0 text-green-600" title="In pantry">
+                        <Package size={16} />
                       </span>
                     )}
                   </li>

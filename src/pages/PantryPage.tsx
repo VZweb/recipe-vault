@@ -80,7 +80,8 @@ export function PantryPage() {
   const [editState, setEditState] = useState<EditState | null>(null);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [clearAllConfirm, setClearAllConfirm] = useState(false);
+  const [clearNonStaplesConfirm, setClearNonStaplesConfirm] = useState(false);
+  const [clearEverythingConfirm, setClearEverythingConfirm] = useState(false);
   const [clearing, setClearing] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -222,7 +223,19 @@ export function PantryPage() {
       setItems((prev) => prev.filter((i) => i.isStaple));
     } finally {
       setClearing(false);
-      setClearAllConfirm(false);
+      setClearNonStaplesConfirm(false);
+    }
+  };
+
+  const handleClearEverything = async () => {
+    if (items.length === 0) return;
+    setClearing(true);
+    try {
+      await Promise.all(items.map((i) => deletePantryItem(i.id)));
+      setItems([]);
+    } finally {
+      setClearing(false);
+      setClearEverythingConfirm(false);
     }
   };
 
@@ -768,36 +781,23 @@ export function PantryPage() {
         <div className="space-y-4">
           {/* Actions bar */}
           <div className="flex items-center justify-between gap-2 flex-wrap">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleCopyPrompt}
-                className="flex items-center gap-1.5 rounded-lg bg-stone-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-stone-700 transition-colors"
-                title="Copy a ChatGPT prompt with all your pantry items"
-              >
-                {copied ? (
-                  <>
-                    <Check size={14} className="text-emerald-500" />
-                    <span className="text-emerald-600">Copied!</span>
-                  </>
-                ) : (
-                  <>
-                    <ClipboardCopy size={14} />
-                    Ask ChatGPT for a recipe
-                  </>
-                )}
-              </button>
-              {items.some((i) => !i.isStaple) && (
-                <button
-                  onClick={() => setClearAllConfirm(true)}
-                  disabled={clearing}
-                  className="flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors"
-                  title="Remove all items except staples"
-                >
-                  <Trash2 size={14} />
-                  {clearing ? "Clearing…" : "Clear non-staples"}
-                </button>
+            <button
+              onClick={handleCopyPrompt}
+              className="flex items-center gap-1.5 rounded-lg bg-stone-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-stone-700 transition-colors"
+              title="Copy a ChatGPT prompt with all your pantry items"
+            >
+              {copied ? (
+                <>
+                  <Check size={14} className="text-emerald-500" />
+                  <span className="text-emerald-600">Copied!</span>
+                </>
+              ) : (
+                <>
+                  <ClipboardCopy size={14} />
+                  Ask ChatGPT for a recipe
+                </>
               )}
-            </div>
+            </button>
             <button
               onClick={allCollapsed ? expandAll : collapseAll}
               className="flex items-center gap-1.5 text-xs text-stone-500 hover:text-stone-700 transition-colors"
@@ -1202,6 +1202,30 @@ export function PantryPage() {
               </section>
             );
           })}
+
+          {/* Clear actions */}
+          <div className="flex items-center gap-2 pt-2 border-t border-stone-100">
+            {items.some((i) => !i.isStaple) && (
+              <button
+                onClick={() => setClearNonStaplesConfirm(true)}
+                disabled={clearing}
+                className="flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors"
+                title="Remove all items except staples"
+              >
+                <Trash2 size={14} />
+                {clearing ? "Clearing…" : "Clear non-staples"}
+              </button>
+            )}
+            <button
+              onClick={() => setClearEverythingConfirm(true)}
+              disabled={clearing}
+              className="flex items-center gap-1.5 rounded-lg border border-red-300 bg-white px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-50 transition-colors"
+              title="Remove all pantry items including staples"
+            >
+              <Trash2 size={14} />
+              {clearing ? "Clearing…" : "Clear all"}
+            </button>
+          </div>
         </div>
       ) : searchQuery.trim() ? (
         <EmptyState
@@ -1235,13 +1259,23 @@ export function PantryPage() {
       />
 
       <ConfirmDialog
-        open={clearAllConfirm}
+        open={clearNonStaplesConfirm}
         title="Clear non-staple items"
         message={`This will remove ${items.filter((i) => !i.isStaple).length} item(s) from your pantry. Staple items will be kept. This cannot be undone.`}
         confirmLabel="Remove all non-staples"
         variant="danger"
         onConfirm={handleClearNonStaples}
-        onCancel={() => setClearAllConfirm(false)}
+        onCancel={() => setClearNonStaplesConfirm(false)}
+      />
+
+      <ConfirmDialog
+        open={clearEverythingConfirm}
+        title="Clear entire pantry"
+        message={`This will permanently remove all ${items.length} item(s) from your pantry, including staples. This cannot be undone.`}
+        confirmLabel="Remove everything"
+        variant="danger"
+        onConfirm={handleClearEverything}
+        onCancel={() => setClearEverythingConfirm(false)}
       />
     </div>
   );
