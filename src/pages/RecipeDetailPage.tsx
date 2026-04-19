@@ -36,6 +36,7 @@ export function RecipeDetailPage() {
   const [cookedCount, setCookedCount] = useState(0);
   const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
   const [checkedSteps, setCheckedSteps] = useState<Set<number>>(new Set());
+  const [checkedIngredients, setCheckedIngredients] = useState<Set<number>>(new Set());
 
   const loadPantry = useCallback(async () => {
     const items = await fetchPantryItems();
@@ -299,13 +300,13 @@ export function RecipeDetailPage() {
               </span>
             )}
           </div>
-          <ul className="space-y-2">
+          <ul className="space-y-1">
             {recipe.ingredients
               .sort((a, b) => a.sortOrder - b.sortOrder)
               .map((ing, i) => {
                 if (ing.isSection) {
                   return (
-                    <li key={i} className="pt-3 first:pt-0">
+                    <li key={i} className="pt-4 first:pt-0 pb-1">
                       <h4 className="text-xs font-semibold uppercase tracking-wider text-stone-500">
                         {ing.name}
                       </h4>
@@ -313,10 +314,21 @@ export function RecipeDetailPage() {
                   );
                 }
                 const inPantry = isInPantry(ing.name, ing.nameSecondary, ing.masterIngredientId);
+                const checked = checkedIngredients.has(i);
+                const toggleChecked = () =>
+                  setCheckedIngredients((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(i)) next.delete(i);
+                    else next.add(i);
+                    return next;
+                  });
                 return (
                   <li
                     key={i}
-                    className={`flex items-start gap-3 rounded-lg px-3 py-2 transition-colors ${
+                    onClick={toggleChecked}
+                    className={`flex items-center gap-2.5 rounded-lg px-2 py-2 cursor-pointer select-none transition-colors ${
+                      checked ? "opacity-50" : ""
+                    } ${
                       inPantry
                         ? "bg-green-50 hover:bg-green-100/70"
                         : "hover:bg-stone-50"
@@ -324,34 +336,52 @@ export function RecipeDetailPage() {
                   >
                     <input
                       type="checkbox"
-                      className="mt-0.5 h-4 w-4 rounded border-stone-300 text-brand-600 focus:ring-brand-500"
+                      checked={checked}
+                      readOnly
+                      className="h-4 w-4 flex-shrink-0 rounded border-stone-300 text-brand-600 focus:ring-brand-500 pointer-events-none"
                     />
-                    <span className="text-sm flex-1">
-                      {ing.quantity && (
-                        <span className="font-medium">{ing.quantity} </span>
-                      )}
-                      {ing.unit && (
-                        <span className="text-stone-500">{ing.unit} </span>
-                      )}
-                      <span className="text-stone-700">{ing.name}</span>
-                      {ing.nameSecondary && (
-                        <span className="ml-1.5 italic text-stone-400">
-                          ({ing.nameSecondary})
+                    <span className="flex-shrink-0 w-[4.5rem]">
+                      {(ing.quantity || ing.unit) ? (
+                        <span className="inline-flex items-baseline gap-1 px-2 py-0.5 w-full">
+                          {ing.quantity && (
+                            <span className="text-sm font-bold tabular-nums text-stone-900">
+                              {ing.quantity}
+                            </span>
+                          )}
+                          {ing.unit && (
+                            <span className="text-[11px] text-stone-500 truncate">
+                              {ing.unit}
+                            </span>
+                          )}
                         </span>
-                      )}
-                      {ing.masterIngredientId && (
-                        <span className="ml-1 inline-flex text-brand-400" title="From catalog">
-                          <Link2 size={12} />
-                        </span>
-                      )}
-                      {ing.note && (
-                        <span className="ml-1.5 text-stone-400 italic">
-                          — {ing.note}
-                        </span>
+                      ) : (
+                        <span className="inline-block w-full" />
                       )}
                     </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className={`text-sm font-medium ${checked ? "line-through text-stone-400" : "text-stone-800"}`}>
+                          {ing.name}
+                        </span>
+                        {ing.nameSecondary && (
+                          <span className="text-sm italic text-stone-400">
+                            ({ing.nameSecondary})
+                          </span>
+                        )}
+                        {ing.masterIngredientId && (
+                          <span className="inline-flex text-brand-400" title="From catalog">
+                            <Link2 size={12} />
+                          </span>
+                        )}
+                      </div>
+                      {ing.note && (
+                        <p className="text-xs text-stone-400 italic mt-0.5 leading-snug">
+                          {ing.note}
+                        </p>
+                      )}
+                    </div>
                     {inPantry && (
-                      <span className="mt-0.5 flex items-center gap-1 text-[10px] font-medium text-green-700 bg-green-100 rounded-full px-1.5 py-0.5 whitespace-nowrap">
+                      <span className="flex-shrink-0 flex items-center gap-1 text-[10px] font-medium text-green-700 bg-green-100 rounded-full px-1.5 py-0.5 whitespace-nowrap">
                         <Check size={10} />
                         In pantry
                       </span>
