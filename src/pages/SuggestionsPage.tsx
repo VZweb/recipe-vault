@@ -73,18 +73,6 @@ export function SuggestionsPage() {
     [recipes, combinedPantry]
   );
 
-  const unmatchedExtras = useMemo(() => {
-    if (extraIngredients.length === 0) return [];
-    const matchedNames = new Set(
-      suggestions.flatMap((s) =>
-        s.matchedIngredients.map((n) => n.toLowerCase())
-      )
-    );
-    return extraIngredients.filter(
-      (e) => !matchedNames.has(e.name.toLowerCase())
-    );
-  }, [extraIngredients, suggestions]);
-
   const matchedExtrasPerRecipe = useMemo(() => {
     if (extraIngredients.length === 0) return new Map<string, string[]>();
     const extraById = new Map(
@@ -108,6 +96,26 @@ export function SuggestionsPage() {
     }
     return map;
   }, [extraIngredients, suggestions]);
+
+  const unmatchedExtras = useMemo(() => {
+    if (extraIngredients.length === 0) return [];
+    const matchedExtraNames = new Set(
+      Array.from(matchedExtrasPerRecipe.values()).flat().map((n) => n.toLowerCase())
+    );
+    return extraIngredients.filter(
+      (e) => !matchedExtraNames.has(e.name.toLowerCase())
+    );
+  }, [extraIngredients, matchedExtrasPerRecipe]);
+
+  const noRecipeWithAllExtras = useMemo(() => {
+    if (extraIngredients.length < 2) return false;
+    const linkedCount = extraIngredients.filter((e) => e.masterIngredientId).length;
+    if (linkedCount < 2) return false;
+    for (const hits of matchedExtrasPerRecipe.values()) {
+      if (hits.length >= linkedCount) return false;
+    }
+    return true;
+  }, [extraIngredients, matchedExtrasPerRecipe]);
 
   const sortedSuggestions = useMemo(() => {
     if (extraIngredients.length === 0) return suggestions;
@@ -231,6 +239,18 @@ export function SuggestionsPage() {
                   {unmatchedExtras.map((e) => e.name).join(", ")}
                 </span>
                 . Showing results based on your other ingredients.
+              </p>
+            </div>
+          )}
+          {noRecipeWithAllExtras && unmatchedExtras.length === 0 && (
+            <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              <Info size={18} className="mt-0.5 flex-shrink-0 text-amber-500" />
+              <p>
+                No single recipe contains all of{" "}
+                <span className="font-semibold">
+                  {extraIngredients.map((e) => e.name).join(", ")}
+                </span>
+                . Showing the best matches below.
               </p>
             </div>
           )}
