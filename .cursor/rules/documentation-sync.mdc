@@ -1,0 +1,33 @@
+---
+description: Keep docs in sync when code or Firebase config changes
+alwaysApply: true
+---
+
+# Documentation maintenance
+
+When you change **application code**, **Firebase rules/indexes**, **env contract** (`.env.example` / `VITE_*`), **routes**, **data model**, **PWA settings**, or **build/deploy** behavior, evaluate whether **project documentation** needs the same update.
+
+## Where docs live
+
+- **Index:** `docs/README.md`
+- **Topics:** `docs/architecture.md`, `docs/data-and-firebase.md`, `docs/domain-logic.md`, `docs/pwa-and-offline.md`, `docs/operations.md`, `docs/security.md`
+- **Quick start:** root `README.md` (keep in sync for onboarding and links)
+
+## When to update (checklist)
+
+After your change, if any of these are true, **edit the relevant doc(s) in the same change** (or follow up immediately):
+
+1. **New/changed route or nav entry** → `docs/architecture.md`, root `README.md` if user-facing paths are listed.
+2. **New Firestore collection/field, query, Storage path, or mapper** → `docs/data-and-firebase.md`; types in `src/types/` are implied.
+3. **Search, suggestions, parsing, or normalization behavior** → `docs/domain-logic.md`
+4. **PWA / manifest / service worker config** → `docs/pwa-and-offline.md`
+5. **Scripts, env vars, deploy, Hosting** → `docs/operations.md`, `.env.example`, root `README.md` as needed.
+6. **Security rules or auth story** → `docs/security.md` and comments in `firestore.rules` / `storage.rules` if the intent changes.
+
+## When not to update docs
+
+Trivial style-only edits, typo fixes in unrelated strings, or refactors with **no** behavior or structure change do not require doc updates.
+
+## Rule of thumb
+
+If a contributor would be misled by the existing docs after your merge, update the docs **now**, not later.

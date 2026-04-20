@@ -64,7 +64,19 @@ src/
   hooks/          React hooks for data fetching
   lib/            Firebase init, Firestore helpers, search, suggestions
   types/          TypeScript type definitions
+docs/             In-depth documentation (architecture, data model, security)
 ```
+
+## Documentation
+
+Detailed docs live under [`docs/`](./docs/README.md):
+
+- [Architecture](./docs/architecture.md) — routing, layout, how layers connect
+- [Data and Firebase](./docs/data-and-firebase.md) — collections, Storage paths, indexes
+- [Domain logic](./docs/domain-logic.md) — search, suggestions, parsing, normalization
+- [PWA and offline](./docs/pwa-and-offline.md) — manifest and service worker
+- [Operations](./docs/operations.md) — env vars, scripts, deploy
+- [Security](./docs/security.md) — Firestore and Storage rules, hardening notes
 
 ## Features
 
