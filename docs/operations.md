@@ -32,6 +32,7 @@ These scripts expect a service account JSON at `scripts/service-account.json` or
 | `node scripts/backfill-ingredients-catalog.mjs` | Set `catalog: true` on ingredient docs that are not user-owned (run before / together with tightening Storage/Firestore rules). |
 | `node scripts/set-catalog-admin-claim.mjs --uid=FIREBASE_AUTH_UID` | Set custom claim `catalogAdmin` so that user may edit the shared ingredient catalog from the app (`--revoke` removes the claim). |
 | `node scripts/backfill-vault-owner.mjs --owner-uid=FIREBASE_UID` | Set `ownerId` on legacy `recipes`, `tags`, `categories`, and `pantry` documents missing it. |
+| `node scripts/export-user-vault-templates.mjs --uid=FIREBASE_UID [--write]` | Dump that user’s tags/categories as TypeScript for `src/data/defaultVaultTemplates.ts` (`--write` overwrites the file; omits tag names containing U+FFFD from bad imports). |
 
 **Deploy order (typical):** run catalog backfill (and vault owner backfill if you have existing data), deploy `firestore.indexes.json`, then deploy rules and the web app. Enable **Authentication** providers in the Firebase console first.
 

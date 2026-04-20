@@ -49,7 +49,7 @@ Stored in the `ingredients` collection. **Catalog** rows (`catalog: true`) are s
 
 ### Default tags and categories for new accounts
 
-Starter lists live in [`src/data/defaultVaultTemplates.ts`](../src/data/defaultVaultTemplates.ts). On sign-in, `ensureUserVaultDefaults()` runs once per account (see `userProfiles`): if the user has **no** tags and/or **no** categories, it copies the templates into `tags` / `categories` with that user’s `ownerId`. Existing users who already have both tags and categories only get `userProfiles` marked so the seed does not run again.
+Starter lists live in [`src/data/defaultVaultTemplates.ts`](../src/data/defaultVaultTemplates.ts). Regenerate them from a reference account with `node scripts/export-user-vault-templates.mjs --uid=... --write` (service account required). On sign-in, `ensureUserVaultDefaults()` runs once per account (see `userProfiles`): if the user has **no** tags and/or **no** categories, it copies the templates into `tags` / `categories` with that user’s `ownerId`. Existing users who already have both tags and categories only get `userProfiles` marked so the seed does not run again.
 
 ## TypeScript types
 
