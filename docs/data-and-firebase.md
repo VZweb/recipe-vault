@@ -2,6 +2,8 @@
 
 The web client uses the Firebase JS SDK. There is no custom REST API: reads and writes go directly to Firestore and Storage from the browser.
 
+**Client cache:** Tags, categories, and the master ingredients list are loaded through **TanStack Query** (see [Architecture](./architecture.md#server-state-cache-tanstack-query--phase-1)) so repeated navigations reuse cached reads within the configured `staleTime`. Planned extensions for **pantry** and **recipe lists** are described in the [TanStack Query roadmap](./tanstack-query-roadmap.md). Until those phases ship, pantry and recipes are still fetched per page or legacy hooks.
+
 ## Initialization
 
 `src/lib/firebase.ts` calls `initializeApp` with values from `import.meta.env` (`VITE_FIREBASE_*`). It exports:

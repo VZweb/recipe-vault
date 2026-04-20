@@ -1,36 +1,42 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchTags, createTag, updateTag, deleteTag } from "@/lib/firestore";
+import { queryKeys, REFERENCE_DATA_STALE_MS } from "@/lib/queryKeys";
 import type { Tag } from "@/types/tag";
 
 export function useTags() {
-  const [tags, setTags] = useState<Tag[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await fetchTags();
-      setTags(data);
-    } catch {
-      // Silently fail — tags are non-critical
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const { data: tags = [], isPending: loading, refetch } = useQuery({
+    queryKey: queryKeys.tags,
+    queryFn: async (): Promise<Tag[]> => {
+      try {
+        return await fetchTags();
+      } catch {
+        return [];
+      }
+    },
+    staleTime: REFERENCE_DATA_STALE_MS,
+  });
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const refresh = useCallback(() => refetch(), [refetch]);
 
   const add = async (name: string, color: string, category: string = "Other") => {
     const id = await createTag(name, color, category);
-    setTags((prev) => [...prev, { id, name, color, category }].sort((a, b) => a.name.localeCompare(b.name)));
+    queryClient.setQueryData<Tag[]>(queryKeys.tags, (prev = []) =>
+      [...prev, { id, name, color, category }].sort((a, b) =>
+        a.name.localeCompare(b.name)
+      )
+    );
     return id;
   };
 
-  const update = async (id: string, fields: { name?: string; color?: string; category?: string }) => {
+  const update = async (
+    id: string,
+    fields: { name?: string; color?: string; category?: string }
+  ) => {
     await updateTag(id, fields);
-    setTags((prev) =>
+    queryClient.setQueryData<Tag[]>(queryKeys.tags, (prev = []) =>
       prev
         .map((t) => (t.id === id ? { ...t, ...fields } : t))
         .sort((a, b) => a.name.localeCompare(b.name))
@@ -39,8 +45,10 @@ export function useTags() {
 
   const remove = async (id: string) => {
     await deleteTag(id);
-    setTags((prev) => prev.filter((t) => t.id !== id));
+    queryClient.setQueryData<Tag[]>(queryKeys.tags, (prev = []) =>
+      prev.filter((t) => t.id !== id)
+    );
   };
 
-  return { tags, loading, add, update, remove, refresh: load };
+  return { tags, loading, add, update, remove, refresh };
 }

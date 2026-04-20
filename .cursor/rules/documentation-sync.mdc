@@ -10,7 +10,7 @@ When you change **application code**, **Firebase rules/indexes**, **env contract
 ## Where docs live
 
 - **Index:** `docs/README.md`
-- **Topics:** `docs/architecture.md`, `docs/data-and-firebase.md`, `docs/domain-logic.md`, `docs/pwa-and-offline.md`, `docs/operations.md`, `docs/security.md`
+- **Topics:** `docs/architecture.md`, `docs/data-and-firebase.md`, `docs/domain-logic.md`, `docs/pwa-and-offline.md`, `docs/operations.md`, `docs/security.md`, `docs/tanstack-query-roadmap.md`
 - **Quick start:** root `README.md` (keep in sync for onboarding and links)
 
 ## When to update (checklist)
@@ -23,6 +23,7 @@ After your change, if any of these are true, **edit the relevant doc(s) in the s
 4. **PWA / manifest / service worker config** → `docs/pwa-and-offline.md`
 5. **Scripts, env vars, deploy, Hosting** → `docs/operations.md`, `.env.example`, root `README.md` as needed.
 6. **Security rules or auth story** → `docs/security.md` and comments in `firestore.rules` / `storage.rules` if the intent changes.
+7. **TanStack Query keys or cached-resource scope** (e.g. new `queryKeys` entries, changing `staleTime`, moving a hook onto/off the cache) → `docs/architecture.md` (server state section), **`docs/tanstack-query-roadmap.md`** (phase scope, checklists, “done” updates), and if behavior crosses Firestore boundaries, `docs/data-and-firebase.md`.
 
 ## When not to update docs
 

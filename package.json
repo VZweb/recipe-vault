@@ -11,6 +11,7 @@
     "deploy": "npm run build && firebase deploy"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.99.2",
     "firebase": "^11.0.0",
     "fuse.js": "^7.0.0",
     "lucide-react": "^0.460.0",

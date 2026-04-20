@@ -1,35 +1,38 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   fetchMasterIngredients,
   addMasterIngredient,
   updateMasterIngredient,
   deleteMasterIngredient,
 } from "@/lib/firestore";
+import { queryKeys, REFERENCE_DATA_STALE_MS } from "@/lib/queryKeys";
 import type { MasterIngredient } from "@/types/ingredient";
 
 export function useIngredients() {
-  const [ingredients, setIngredients] = useState<MasterIngredient[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await fetchMasterIngredients();
-      setIngredients(data);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const { data: ingredients = [], isPending: loading, refetch } = useQuery({
+    queryKey: queryKeys.masterIngredients,
+    queryFn: async (): Promise<MasterIngredient[]> => {
+      try {
+        return await fetchMasterIngredients();
+      } catch {
+        return [];
+      }
+    },
+    staleTime: REFERENCE_DATA_STALE_MS,
+  });
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const refresh = useCallback(() => refetch(), [refetch]);
 
   const add = async (item: Omit<MasterIngredient, "id">) => {
     const id = await addMasterIngredient(item);
     const newItem: MasterIngredient = { id, ...item };
-    setIngredients((prev) =>
-      [...prev, newItem].sort((a, b) => a.name.localeCompare(b.name))
+    queryClient.setQueryData<MasterIngredient[]>(
+      queryKeys.masterIngredients,
+      (prev = []) =>
+        [...prev, newItem].sort((a, b) => a.name.localeCompare(b.name))
     );
     return id;
   };
@@ -39,17 +42,22 @@ export function useIngredients() {
     data: Partial<Omit<MasterIngredient, "id">>
   ) => {
     await updateMasterIngredient(id, data);
-    setIngredients((prev) =>
-      prev
-        .map((i) => (i.id === id ? { ...i, ...data } : i))
-        .sort((a, b) => a.name.localeCompare(b.name))
+    queryClient.setQueryData<MasterIngredient[]>(
+      queryKeys.masterIngredients,
+      (prev = []) =>
+        prev
+          .map((i) => (i.id === id ? { ...i, ...data } : i))
+          .sort((a, b) => a.name.localeCompare(b.name))
     );
   };
 
   const remove = async (id: string) => {
     await deleteMasterIngredient(id);
-    setIngredients((prev) => prev.filter((i) => i.id !== id));
+    queryClient.setQueryData<MasterIngredient[]>(
+      queryKeys.masterIngredients,
+      (prev = []) => prev.filter((i) => i.id !== id)
+    );
   };
 
-  return { ingredients, loading, add, update, remove, refresh: load };
+  return { ingredients, loading, add, update, remove, refresh };
 }

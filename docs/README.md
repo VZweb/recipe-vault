@@ -4,7 +4,8 @@ Project docs live in this folder. Start here, then follow links by topic.
 
 | Document | What it covers |
 |----------|----------------|
-| [Architecture](./architecture.md) | App shell, routing, layout, how UI layers connect |
+| [Architecture](./architecture.md) | App shell, routing, layout, TanStack Query cache (phase 1) |
+| [TanStack Query roadmap](./tanstack-query-roadmap.md) | Phases 2–3 (pantry, recipes): plan, files, checklists |
 | [Data and Firebase](./data-and-firebase.md) | Collections, types, Firestore helpers, Storage paths |
 | [Domain logic](./domain-logic.md) | Search, suggestions, normalization, parsing |
 | [PWA and offline](./pwa-and-offline.md) | Service worker, manifest, caching behavior |

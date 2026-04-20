@@ -7,6 +7,7 @@ A personal recipe manager PWA powered by Firebase. Store recipes, organize with 
 - **React 18** + TypeScript + Vite
 - **TailwindCSS** for styling
 - **Firebase** (Firestore, Storage, Hosting)
+- **TanStack Query** for cached reads of shared reference data (tags, categories, master ingredients)
 - **Fuse.js** for client-side search
 - **Lucide** for icons
 - **vite-plugin-pwa** for offline support

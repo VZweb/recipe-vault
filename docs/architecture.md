@@ -5,7 +5,7 @@ Recipe Vault is a single-page application: React 18, TypeScript, Vite, client-si
 ## Bootstrap
 
 - `index.html` loads `src/main.tsx`.
-- `main.tsx` mounts the app under `StrictMode`, wraps it in `BrowserRouter`, and imports global styles (`index.css`).
+- `main.tsx` mounts the app under `StrictMode`, wraps the tree in **`QueryClientProvider`** (TanStack Query), then `BrowserRouter`, and imports global styles (`index.css`).
 - `App.tsx` defines all routes; page content renders inside `AppLayout` via React Router’s `<Outlet />`.
 
 ## Routing
@@ -63,9 +63,29 @@ flowchart TB
 - **Pages**: route-level composition, URL/query handling, wiring hooks to UI.
 - **Components**: reusable UI (including `components/recipe`, `components/ui`, `components/layout`).
 - **Hooks**: load and mutate domain data, often wrapping `lib/firestore` and related helpers.
-- **Lib**: Firebase initialization, Firestore CRUD, Storage uploads, search index building, pure domain functions.
+- **Lib**: Firebase initialization, Firestore CRUD, Storage uploads, search index building, pure domain functions, TanStack Query client factory and **query keys** (`queryClient.ts`, `queryKeys.ts`).
 
 Types in `src/types/` mirror persisted shapes where relevant; see [Data and Firebase](./data-and-firebase.md).
+
+## Server state cache (TanStack Query) — phase 1
+
+[TanStack Query](https://tanstack.com/query/latest) caches async reads and deduplicates in-flight requests. **Phase 1** applies it only to **reference data** that many screens share:
+
+| Query key | Hook | Firestore |
+|-----------|------|-----------|
+| `['tags']` | `useTags` | `tags` collection |
+| `['categories']` | `useCategories` | `categories` collection |
+| `['masterIngredients']` | `useIngredients` | `ingredients` collection (master catalog) |
+
+- **`staleTime`:** `REFERENCE_DATA_STALE_MS` in `src/lib/queryKeys.ts` (5 minutes). While data is fresh, mounting another component that uses the same hook does **not** trigger a redundant `getDocs` for that list.
+- **Mutations:** `add` / `update` / `remove` (and categories’ `edit`) still call Firestore, then update the cache with **`queryClient.setQueryData`** so the UI stays correct without an extra refetch.
+- **`refresh`:** still exposed from each hook; it runs TanStack’s **`refetch`** for that query (forces a network read).
+
+Recipes, pantry, and single-recipe loads still use the previous `useEffect`-based hooks or page-level fetches until a later phase.
+
+**Planned next steps** (query keys, files to touch, acceptance checklists): [TanStack Query migration roadmap](./tanstack-query-roadmap.md) — **Phase 2** (pantry), **Phase 3** (recipe lists; optional **3b** single recipe).
+
+When adding new cached resources, define stable **`queryKey`s in `queryKeys.ts`** and document them in this section and in the roadmap when applicable.
 
 ## Path alias
 
