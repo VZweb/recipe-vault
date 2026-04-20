@@ -5,15 +5,17 @@ Recipe Vault is a single-page application: React 18, TypeScript, Vite, client-si
 ## Bootstrap
 
 - `index.html` loads `src/main.tsx`.
-- `main.tsx` mounts the app under `StrictMode`, wraps the tree in **`QueryClientProvider`** (TanStack Query), then `BrowserRouter`, and imports global styles (`index.css`).
-- `App.tsx` defines all routes; page content renders inside `AppLayout` via React Router’s `<Outlet />`.
+- `main.tsx` mounts the app under `StrictMode`, wraps the tree in **`QueryClientProvider`** (TanStack Query), then **`AuthProvider`** (Firebase Auth state), then `BrowserRouter`, and imports global styles (`index.css`).
+- `App.tsx` defines routes: public **`/login`** and **`/register`**, then an auth gate (**`RequireAuth`**) wrapping **`AppLayout`** and all main app pages via `<Outlet />`.
 
 ## Routing
 
-Routes live in `src/App.tsx`. All primary routes are nested under `AppLayout` so the header and navigation stay consistent.
+Routes live in `src/App.tsx`. Unauthenticated visitors are redirected to **`/login`**. After sign-in, primary routes render inside `AppLayout`.
 
 | Path | Page component | Notes |
 |------|----------------|--------|
+| `/login` | `LoginPage` | Email/password, Google, password reset |
+| `/register` | `RegisterPage` | Email/password, Google |
 | `/` | `HomePage` | |
 | `/recipes` | `RecipeListPage` | List and search entry (`?search=true` on mobile) |
 | `/recipes/new` | `RecipeEditorPage` | Create |
@@ -30,7 +32,7 @@ Routes live in `src/App.tsx`. All primary routes are nested under `AppLayout` so
 
 `AppLayout` provides:
 
-- Sticky top header with desktop nav links and a mobile search shortcut to `/recipes?search=true`.
+- Sticky top header with desktop nav links, **signed-in email** and **sign out**, and a mobile search shortcut to `/recipes?search=true`.
 - Main content area with `max-w-5xl` and an `<Outlet />` for the active route.
 - Fixed bottom navigation on small screens (`md:hidden`).
 - `ScrollToTop` on pathname changes.
@@ -73,9 +75,9 @@ Types in `src/types/` mirror persisted shapes where relevant; see [Data and Fire
 
 | Query key | Hook | Firestore |
 |-----------|------|-----------|
-| `['tags']` | `useTags` | `tags` collection |
-| `['categories']` | `useCategories` | `categories` collection |
-| `['masterIngredients']` | `useIngredients` | `ingredients` collection (master catalog) |
+| `['tags', uid]` | `useTags` | `tags` for the signed-in user |
+| `['categories', uid]` | `useCategories` | `categories` for the signed-in user |
+| `['masterIngredients', uid]` | `useIngredients` | merged catalog + user `ingredients` |
 
 - **`staleTime`:** `REFERENCE_DATA_STALE_MS` in `src/lib/queryKeys.ts` (5 minutes). While data is fresh, mounting another component that uses the same hook does **not** trigger a redundant `getDocs` for that list.
 - **Mutations:** `add` / `update` / `remove` (and categories’ `edit`) still call Firestore, then update the cache with **`queryClient.setQueryData`** so the UI stays correct without an extra refetch.

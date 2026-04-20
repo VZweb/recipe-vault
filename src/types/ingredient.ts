@@ -4,6 +4,8 @@ export interface MasterIngredient {
   nameGr: string;
   aliases: string[];
   category: IngredientCategory;
+  /** True when this row is the shared catalog (Firestore `catalog: true`). */
+  isCatalog?: boolean;
 }
 
 export type IngredientCategory =

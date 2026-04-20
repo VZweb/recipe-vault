@@ -2,7 +2,7 @@
 
 This document records **planned phases** for moving Firestore reads into [TanStack Query](https://tanstack.com/query/latest). **Phase 1 is implemented** (reference lists). Use this file when resuming work so scope and touch points stay clear.
 
-**Implemented today:** tags, categories, master ingredients — see [Architecture → Server state cache](./architecture.md#server-state-cache-tanstack-query--phase-1) and `src/lib/queryKeys.ts`.
+**Implemented today:** tags, categories, master ingredients — see [Architecture → Server state cache](./architecture.md#server-state-cache-tanstack-query--phase-1) and `src/lib/queryKeys.ts`. Query keys include the signed-in user’s **Firebase uid** (e.g. `['tags', uid]`) so the cache stays scoped per account.
 
 ---
 

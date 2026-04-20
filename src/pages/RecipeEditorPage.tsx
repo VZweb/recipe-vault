@@ -267,13 +267,12 @@ export function RecipeEditorPage() {
 
   const handleImageSelect = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    const tempId = id ?? "temp-" + Date.now();
     const newUrls: string[] = [];
     const newPreviews: string[] = [];
 
     for (const file of Array.from(files)) {
       newPreviews.push(URL.createObjectURL(file));
-      const url = await upload(tempId, file);
+      const url = await upload(file);
       newUrls.push(url);
     }
 

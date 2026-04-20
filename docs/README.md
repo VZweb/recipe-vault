@@ -10,6 +10,6 @@ Project docs live in this folder. Start here, then follow links by topic.
 | [Domain logic](./domain-logic.md) | Search, suggestions, normalization, parsing |
 | [PWA and offline](./pwa-and-offline.md) | Service worker, manifest, caching behavior |
 | [Operations](./operations.md) | Env vars, build, deploy, Firebase Hosting |
-| [Security](./security.md) | Firestore and Storage rules, hardening path |
+| [Security](./security.md) | Authentication, Firestore and Storage rules, catalog vs user data |
 
 The root [README](../README.md) remains the quick start for clone, install, and first run.

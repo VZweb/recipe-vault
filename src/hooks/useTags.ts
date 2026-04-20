@@ -1,14 +1,17 @@
 import { useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchTags, createTag, updateTag, deleteTag } from "@/lib/firestore";
+import { useAuth } from "@/contexts/AuthContext";
 import { queryKeys, REFERENCE_DATA_STALE_MS } from "@/lib/queryKeys";
 import type { Tag } from "@/types/tag";
 
 export function useTags() {
+  const { user } = useAuth();
   const queryClient = useQueryClient();
+  const uid = user?.uid ?? "";
 
   const { data: tags = [], isPending: loading, refetch } = useQuery({
-    queryKey: queryKeys.tags,
+    queryKey: queryKeys.tags(uid),
     queryFn: async (): Promise<Tag[]> => {
       try {
         return await fetchTags();
@@ -16,6 +19,7 @@ export function useTags() {
         return [];
       }
     },
+    enabled: !!user,
     staleTime: REFERENCE_DATA_STALE_MS,
   });
 
@@ -23,7 +27,7 @@ export function useTags() {
 
   const add = async (name: string, color: string, category: string = "Other") => {
     const id = await createTag(name, color, category);
-    queryClient.setQueryData<Tag[]>(queryKeys.tags, (prev = []) =>
+    queryClient.setQueryData<Tag[]>(queryKeys.tags(uid), (prev = []) =>
       [...prev, { id, name, color, category }].sort((a, b) =>
         a.name.localeCompare(b.name)
       )
@@ -36,7 +40,7 @@ export function useTags() {
     fields: { name?: string; color?: string; category?: string }
   ) => {
     await updateTag(id, fields);
-    queryClient.setQueryData<Tag[]>(queryKeys.tags, (prev = []) =>
+    queryClient.setQueryData<Tag[]>(queryKeys.tags(uid), (prev = []) =>
       prev
         .map((t) => (t.id === id ? { ...t, ...fields } : t))
         .sort((a, b) => a.name.localeCompare(b.name))
@@ -45,7 +49,7 @@ export function useTags() {
 
   const remove = async (id: string) => {
     await deleteTag(id);
-    queryClient.setQueryData<Tag[]>(queryKeys.tags, (prev = []) =>
+    queryClient.setQueryData<Tag[]>(queryKeys.tags(uid), (prev = []) =>
       prev.filter((t) => t.id !== id)
     );
   };

@@ -1,17 +1,32 @@
 # Security
 
-## Current posture (MVP)
+## Current posture
 
-`firestore.rules` and `storage.rules` allow **read and write for all clients** (`allow read, write: if true`). Comments in those files note: single-user MVP with **no Firebase Auth**.
+The app uses **Firebase Authentication** (email/password and Google). Signed-in users access only their own **vault** data: `recipes`, `tags`, `categories`, and `pantry` documents include an **`ownerId`** field (Firebase Auth `uid`) that must match `request.auth.uid` in Firestore rules.
 
-Anyone with your Firebase config can read or modify data in that project. Treat `.env` as secret-adjacent (API keys are restricted in Google Cloud Console, but data rules are still wide open).
+### Ingredients catalog
 
-## Hardening path
+Documents in **`ingredients`** are either:
 
-When you add Firebase Authentication:
+- **Shared catalog:** `catalog: true` (typically no `ownerId`) — readable by any signed-in user. **Create / update / delete** from the client is allowed only for accounts that have the Auth **custom claim** `catalogAdmin: true` (set with `node scripts/set-catalog-admin-claim.mjs --uid=YOUR_AUTH_UID` using the Admin SDK service account). Everyone else sees catalog rows as read-only in the app; Firestore rules enforce the same.
+- **User-owned:** `ownerId` equals the user’s `uid` and `catalog` is false — that user may create, update, or delete their own rows.
 
-1. Replace open rules with user-scoped rules (for example `request.auth != null` and document paths or custom claims that identify the owner).
-2. Update `src/lib/firebase.ts` to initialize Auth and gate writes in the UI as needed.
-3. Update [Architecture](./architecture.md) and [Data and Firebase](./data-and-firebase.md) to describe the auth model.
+From the repository root, run `node scripts/backfill-ingredients-catalog.mjs` once on existing data so legacy catalog rows get `catalog: true` before relying on these rules.
 
-Keep this file aligned with the actual rule files; the rules files are the source of truth for enforcement.
+After granting `catalogAdmin`, that user should **sign out and back in** (or otherwise refresh the ID token) so the claim appears in `getIdTokenResult()` and in rule evaluation.
+
+### Storage
+
+Paths are user-scoped:
+
+- Recipe images: `recipes/{uid}/files/...`
+- Pantry images: `pantry/{uid}/{itemId}/...`
+
+Rules allow read/write only when `request.auth.uid` matches the path segment.
+
+## Operations notes
+
+- Treat `.env` as secret-adjacent; Firebase web API keys are restricted in Google Cloud Console where possible.
+- Service account keys (for scripts) must never ship to the browser or public repos.
+
+Keep this file aligned with [`firestore.rules`](../firestore.rules) and [`storage.rules`](../storage.rules); those files are the source of truth for enforcement.

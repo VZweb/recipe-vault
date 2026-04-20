@@ -6,7 +6,7 @@ A personal recipe manager PWA powered by Firebase. Store recipes, organize with 
 
 - **React 18** + TypeScript + Vite
 - **TailwindCSS** for styling
-- **Firebase** (Firestore, Storage, Hosting)
+- **Firebase** (Firestore, Storage, Hosting, Authentication)
 - **TanStack Query** for cached reads of shared reference data (tags, categories, master ingredients)
 - **Fuse.js** for client-side search
 - **Lucide** for icons
@@ -29,9 +29,11 @@ npm install
 ```
 
 2. Create a Firebase project at [console.firebase.google.com](https://console.firebase.google.com):
-   - Enable **Cloud Firestore** (start in test mode)
-   - Enable **Firebase Storage** (start in test mode)
+   - Enable **Cloud Firestore**
+   - Enable **Firebase Storage**
+   - Enable **Authentication** → sign-in methods: **Email/Password** and **Google** (add support email for Google if prompted)
    - Register a web app and copy the config
+   - Add `localhost` (and your production domain) under Authentication → **Authorized domains**
 
 3. Create a `.env` file from the example:
 
@@ -46,6 +48,10 @@ cp .env.example .env
 ```bash
 npm run dev
 ```
+
+6. If you already have Firestore data from before multi-user rules, run the backfill scripts in [`docs/operations.md`](docs/operations.md) (ingredients `catalog` flag and optional `ownerId` on vault documents), then deploy `firestore.rules`, `storage.rules`, and `firestore.indexes.json` with the Firebase CLI.
+
+Sign in at `/login` to use the app; unauthenticated users are redirected there automatically.
 
 ### Deploy to Firebase Hosting
 

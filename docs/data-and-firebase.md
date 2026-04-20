@@ -2,16 +2,18 @@
 
 The web client uses the Firebase JS SDK. There is no custom REST API: reads and writes go directly to Firestore and Storage from the browser.
 
-**Client cache:** Tags, categories, and the master ingredients list are loaded through **TanStack Query** (see [Architecture](./architecture.md#server-state-cache-tanstack-query--phase-1)) so repeated navigations reuse cached reads within the configured `staleTime`. Planned extensions for **pantry** and **recipe lists** are described in the [TanStack Query roadmap](./tanstack-query-roadmap.md). Until those phases ship, pantry and recipes are still fetched per page or legacy hooks.
+**Client cache:** Tags, categories, and the master ingredients list are loaded through **TanStack Query** (see [Architecture](./architecture.md#server-state-cache-tanstack-query--phase-1)) so repeated navigations reuse cached reads within the configured `staleTime`. Query keys include the signed-in user’s **uid** so caches do not leak across accounts. Planned extensions for **pantry** and **recipe lists** are described in the [TanStack Query roadmap](./tanstack-query-roadmap.md). Until those phases ship, pantry and recipes are still fetched per page or legacy hooks.
 
 ## Initialization
 
 `src/lib/firebase.ts` calls `initializeApp` with values from `import.meta.env` (`VITE_FIREBASE_*`). It exports:
 
+- `auth` — Firebase Auth instance
 - `db` — Firestore instance
 - `storage` — Firebase Storage instance
+- `requireUid()` — throws if no user is signed in (used from `firestore.ts` for vault writes)
 
-There is **no Firebase Authentication** in the app today; security rules are open for MVP (see [Security](./security.md)).
+Enable **Email/Password** and **Google** sign-in providers in the Firebase console, and add your hosting and localhost domains under **Authorized domains**.
 
 ## Firestore collections
 
@@ -19,30 +21,30 @@ Collection names and mapping logic live in `src/lib/firestore.ts`.
 
 | Collection | Purpose | Ordering / queries used |
 |------------|---------|-------------------------|
-| `recipes` | Recipe documents | Default list: `orderBy("createdAt", "desc")`. Optional filters: `array-contains-any` on `tags` (max 10 tag IDs per Firestore constraint), `where("categoryId", "==", id)`. Client-side sort after fetch when combining filters. |
-| `tags` | Tag metadata | `orderBy("name")` |
-| `categories` | Recipe categories | `orderBy("name")` |
-| `pantry` | Pantry items | `orderBy("name")`, then client sort by category and name |
-| `ingredients` | Master ingredient catalog | `orderBy("name")` |
+| `recipes` | Recipe documents | `where("ownerId","==",uid)` plus `orderBy("createdAt","desc")` or filters on `tags` / `categoryId` (composite indexes required). |
+| `tags` | Tag metadata | `where("ownerId","==",uid)`, `orderBy("name")` |
+| `categories` | Recipe categories | `where("ownerId","==",uid)`, `orderBy("name")` |
+| `pantry` | Pantry items | `where("ownerId","==",uid)`, `orderBy("name")`, then client sort by category and name |
+| `ingredients` | Master ingredient catalog | Two queries merged in the client: `where("catalog","==",true)` and `where("ownerId","==",uid)`, each with `orderBy("name")` |
 
 ### Recipe documents
 
-Recipes store arrays of ingredient lines and step strings, optional `categoryId`, `tags` (array of tag document IDs), `imageUrls`, timestamps (`createdAt`, `updatedAt`), and `cookedCount`. `docToRecipe` normalizes missing fields when reading.
+Recipes store **`ownerId`**, arrays of ingredient lines and step strings, optional `categoryId`, `tags` (array of tag document IDs), `imageUrls`, timestamps (`createdAt`, `updatedAt`), and `cookedCount`. `docToRecipe` normalizes missing fields when reading.
 
 Deleting a recipe removes linked Storage objects best-effort (`deleteRecipe` + `deleteRecipeImage`).
 
 ### Tags and categories
 
-- **Delete tag**: batches removal of that tag id from every recipe’s `tags` array, then deletes the tag document.
-- **Delete category**: sets `categoryId` to `null` on affected recipes, then deletes the category.
+- **Delete tag**: batches removal of that tag id from every **owned** recipe’s `tags` array, then deletes the tag document.
+- **Delete category**: sets `categoryId` to `null` on affected **owned** recipes, then deletes the category.
 
 ### Pantry
 
-Pantry items reference `masterIngredientId` (string). Deleting a pantry item removes its `imageUrl` file from Storage when present (dynamic import of `deletePantryImage`).
+Pantry items store **`ownerId`** and reference `masterIngredientId` (string). Deleting a pantry item removes its `imageUrl` file from Storage when present (dynamic import of `deletePantryImage`).
 
 ### Master ingredients
 
-Stored in the `ingredients` collection (not named `masterIngredients` in Firestore). Used for autocomplete, Greek names, aliases, and matching in search and suggestions.
+Stored in the `ingredients` collection. **Catalog** rows (`catalog: true`) are shared defaults for every user; only accounts with the **`catalogAdmin`** Auth custom claim may create, update, or delete them from the client (see `scripts/set-catalog-admin-claim.mjs` and `firestore.rules`). **User** rows (`ownerId` set, `catalog: false`) are editable by that owner. `docToMasterIngredient` sets `isCatalog` for the UI.
 
 ## TypeScript types
 
@@ -52,11 +54,17 @@ Canonical shapes are in `src/types/` (`recipe.ts`, `tag.ts`, `category.ts`, `pan
 
 Implemented in `src/lib/storage.ts`:
 
-- Recipe images: `recipes/{recipeId}/{timestamp-random}.{ext}`
-- Pantry images: `pantry/{itemId}/{timestamp-random}.{ext}`
+- Recipe images: `recipes/{uid}/files/{timestamp-random}.{ext}`
+- Pantry images: `pantry/{uid}/{itemId}/{timestamp-random}.{ext}`
 
 Download URLs are stored on documents (`imageUrls` on recipes, `imageUrl` on pantry items).
 
 ## Indexes
 
-`firestore.indexes.json` is currently empty. If you add composite queries that require indexes, deploy them with `firebase deploy` (or the Firebase console) and document new query combinations here.
+Composite indexes for `ownerId` (and `catalog`) combinations live in [`firestore.indexes.json`](../firestore.indexes.json). Deploy with `firebase deploy --only firestore:indexes` (or full `firebase deploy`) after the console prompts you if a query fails in development.
+
+## Data migrations
+
+- **Catalog flag:** from the repository root, `node scripts/backfill-ingredients-catalog.mjs` — sets `catalog: true` on ingredient docs that are not user-owned.
+- **Existing vault data:** `node scripts/backfill-vault-owner.mjs --owner-uid=YOUR_UID` — assigns `ownerId` on legacy `recipes`, `tags`, `categories`, and `pantry` documents missing it so they appear for that account after rules tighten.
+- **Recipe import:** `scripts/import-recipes.mjs` requires `--owner-uid=` for real writes so imported recipes and new tags are owned by that user.

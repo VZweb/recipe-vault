@@ -14,7 +14,7 @@ import {
   Timestamp,
   type DocumentData,
 } from "firebase/firestore";
-import { db } from "./firebase";
+import { db, refreshAuthIdToken, requireUid } from "./firebase";
 import { deleteRecipeImage } from "./storage";
 import type { Recipe, RecipeFormData } from "@/types/recipe";
 import type { Tag } from "@/types/tag";
@@ -97,16 +97,14 @@ function docToPantryItem(id: string, data: DocumentData): PantryItem {
   };
 }
 
-function docToMasterIngredient(
-  id: string,
-  data: DocumentData
-): MasterIngredient {
+function docToMasterIngredient(id: string, data: DocumentData): MasterIngredient {
   return {
     id,
     name: data.name ?? "",
     nameGr: data.nameGr ?? "",
     aliases: data.aliases ?? [],
     category: data.category ?? "Other",
+    isCatalog: data.catalog === true,
   };
 }
 
@@ -116,14 +114,23 @@ export async function fetchRecipes(
   tagIds?: string[],
   categoryId?: string
 ): Promise<Recipe[]> {
+  const uid = requireUid();
   let q;
 
   if (tagIds && tagIds.length > 0 && tagIds.length <= 10) {
-    q = query(recipesCol, where("tags", "array-contains-any", tagIds));
+    q = query(
+      recipesCol,
+      where("ownerId", "==", uid),
+      where("tags", "array-contains-any", tagIds)
+    );
   } else if (categoryId) {
-    q = query(recipesCol, where("categoryId", "==", categoryId));
+    q = query(
+      recipesCol,
+      where("ownerId", "==", uid),
+      where("categoryId", "==", categoryId)
+    );
   } else {
-    q = query(recipesCol, orderBy("createdAt", "desc"));
+    q = query(recipesCol, where("ownerId", "==", uid), orderBy("createdAt", "desc"));
   }
 
   const snap = await getDocs(q);
@@ -145,9 +152,11 @@ export async function fetchRecipe(id: string): Promise<Recipe | null> {
 }
 
 export async function createRecipe(data: RecipeFormData): Promise<string> {
+  const uid = requireUid();
   const now = Timestamp.now();
   const docRef = await addDoc(recipesCol, {
     ...data,
+    ownerId: uid,
     createdAt: now,
     updatedAt: now,
   });
@@ -183,7 +192,8 @@ export async function incrementCookedCount(id: string): Promise<void> {
 // --- Tags ---
 
 export async function fetchTags(): Promise<Tag[]> {
-  const q = query(tagsCol, orderBy("name"));
+  const uid = requireUid();
+  const q = query(tagsCol, where("ownerId", "==", uid), orderBy("name"));
   const snap = await getDocs(q);
   return snap.docs.map((d) => docToTag(d.id, d.data()));
 }
@@ -193,7 +203,8 @@ export async function createTag(
   color: string,
   category: string = "Other"
 ): Promise<string> {
-  const docRef = await addDoc(tagsCol, { name, color, category });
+  const uid = requireUid();
+  const docRef = await addDoc(tagsCol, { name, color, category, ownerId: uid });
   return docRef.id;
 }
 
@@ -205,8 +216,13 @@ export async function updateTag(
 }
 
 export async function deleteTag(id: string): Promise<void> {
+  const uid = requireUid();
   const recipesWithTag = await getDocs(
-    query(recipesCol, where("tags", "array-contains", id))
+    query(
+      recipesCol,
+      where("ownerId", "==", uid),
+      where("tags", "array-contains", id)
+    )
   );
 
   if (!recipesWithTag.empty) {
@@ -227,7 +243,8 @@ export async function deleteTag(id: string): Promise<void> {
 // --- Categories ---
 
 export async function fetchCategories(): Promise<Category[]> {
-  const q = query(categoriesCol, orderBy("name"));
+  const uid = requireUid();
+  const q = query(categoriesCol, where("ownerId", "==", uid), orderBy("name"));
   const snap = await getDocs(q);
   return snap.docs.map((d) => docToCategory(d.id, d.data()));
 }
@@ -237,7 +254,13 @@ export async function createCategory(
   icon: string,
   description: string = ""
 ): Promise<string> {
-  const docRef = await addDoc(categoriesCol, { name, icon, description });
+  const uid = requireUid();
+  const docRef = await addDoc(categoriesCol, {
+    name,
+    icon,
+    description,
+    ownerId: uid,
+  });
   return docRef.id;
 }
 
@@ -249,8 +272,13 @@ export async function updateCategory(
 }
 
 export async function deleteCategory(id: string): Promise<void> {
+  const uid = requireUid();
   const recipesWithCategory = await getDocs(
-    query(recipesCol, where("categoryId", "==", id))
+    query(
+      recipesCol,
+      where("ownerId", "==", uid),
+      where("categoryId", "==", id)
+    )
   );
 
   if (!recipesWithCategory.empty) {
@@ -268,7 +296,8 @@ export async function deleteCategory(id: string): Promise<void> {
 // --- Pantry ---
 
 export async function fetchPantryItems(): Promise<PantryItem[]> {
-  const q = query(pantryCol, orderBy("name"));
+  const uid = requireUid();
+  const q = query(pantryCol, where("ownerId", "==", uid), orderBy("name"));
   const snap = await getDocs(q);
   const items = snap.docs.map((d) => docToPantryItem(d.id, d.data()));
   return items.sort((a, b) =>
@@ -279,8 +308,10 @@ export async function fetchPantryItems(): Promise<PantryItem[]> {
 export async function addPantryItem(
   item: Omit<PantryItem, "id" | "addedAt">
 ): Promise<string> {
+  const uid = requireUid();
   const docRef = await addDoc(pantryCol, {
     ...item,
+    ownerId: uid,
     addedAt: Timestamp.now(),
   });
   return docRef.id;
@@ -304,24 +335,58 @@ export async function deletePantryItem(id: string): Promise<void> {
   }
 }
 
-// --- Master Ingredients ---
+// --- Master Ingredients (catalog + user-owned) ---
 
 export async function fetchMasterIngredients(): Promise<MasterIngredient[]> {
-  const q = query(ingredientsCol, orderBy("name"));
-  const snap = await getDocs(q);
-  return snap.docs.map((d) => docToMasterIngredient(d.id, d.data()));
+  const uid = requireUid();
+  const [catSnap, userSnap] = await Promise.all([
+    getDocs(query(ingredientsCol, where("catalog", "==", true), orderBy("name"))),
+    getDocs(query(ingredientsCol, where("ownerId", "==", uid), orderBy("name"))),
+  ]);
+  const merged = new Map<string, MasterIngredient>();
+  for (const d of catSnap.docs) {
+    merged.set(d.id, docToMasterIngredient(d.id, d.data()));
+  }
+  for (const d of userSnap.docs) {
+    merged.set(d.id, docToMasterIngredient(d.id, d.data()));
+  }
+  return [...merged.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export async function addMasterIngredient(
-  item: Omit<MasterIngredient, "id">
+  item: Omit<MasterIngredient, "id" | "isCatalog">
 ): Promise<string> {
-  const docRef = await addDoc(ingredientsCol, item);
+  const uid = requireUid();
+  const docRef = await addDoc(ingredientsCol, {
+    name: item.name,
+    nameGr: item.nameGr,
+    aliases: item.aliases,
+    category: item.category,
+    ownerId: uid,
+    catalog: false,
+  });
+  return docRef.id;
+}
+
+/** Shared catalog row; requires `catalogAdmin` custom claim (Firestore rules). */
+export async function addCatalogMasterIngredient(
+  item: Omit<MasterIngredient, "id" | "isCatalog">
+): Promise<string> {
+  requireUid();
+  await refreshAuthIdToken();
+  const docRef = await addDoc(ingredientsCol, {
+    name: item.name,
+    nameGr: item.nameGr,
+    aliases: item.aliases,
+    category: item.category,
+    catalog: true,
+  });
   return docRef.id;
 }
 
 export async function updateMasterIngredient(
   id: string,
-  data: Partial<Omit<MasterIngredient, "id">>
+  data: Partial<Omit<MasterIngredient, "id" | "isCatalog">>
 ): Promise<void> {
   await updateDoc(doc(db, "ingredients", id), data);
 }

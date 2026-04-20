@@ -1,11 +1,81 @@
 rules_version = '2';
-// Narrative and hardening notes: docs/security.md
+// Narrative: docs/security.md
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      // MVP: open access (single user, no auth)
-      // Lock this down when adding Firebase Auth
-      allow read, write: if true;
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    /** Set via Admin SDK: `node scripts/set-catalog-admin-claim.mjs --uid=...` */
+    function isCatalogAdmin() {
+      return signedIn() && request.auth.token.catalogAdmin == true;
+    }
+
+    match /recipes/{recipeId} {
+      allow read: if signedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid;
+      allow update, delete: if signedIn() && resource.data.ownerId == request.auth.uid;
+    }
+
+    match /tags/{tagId} {
+      allow read: if signedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid;
+      allow update, delete: if signedIn() && resource.data.ownerId == request.auth.uid;
+    }
+
+    match /categories/{categoryId} {
+      allow read: if signedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid;
+      allow update, delete: if signedIn() && resource.data.ownerId == request.auth.uid;
+    }
+
+    match /pantry/{pantryId} {
+      allow read: if signedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid;
+      allow update, delete: if signedIn() && resource.data.ownerId == request.auth.uid;
+    }
+
+    match /ingredients/{ingredientId} {
+      allow read: if signedIn() && (
+        resource.data.get("catalog", false) == true ||
+        resource.data.get("ownerId", "") == request.auth.uid
+      );
+      allow create: if signedIn() && (
+        (
+          request.resource.data.ownerId == request.auth.uid
+          && request.resource.data.get("catalog", false) == false
+        )
+        || (
+          isCatalogAdmin()
+          && request.resource.data.get("catalog", false) == true
+          && (
+            !request.resource.data.keys().hasAny(["ownerId"])
+            || request.resource.data.ownerId == request.auth.uid
+          )
+        )
+      );
+      allow update: if signedIn() && (
+        (
+          resource.data.get("ownerId", "") == request.auth.uid
+          && resource.data.get("catalog", false) == false
+        )
+        || (
+          isCatalogAdmin()
+          && resource.data.get("catalog", false) == true
+          && request.resource.data.get("catalog", false) == true
+        )
+      );
+      allow delete: if signedIn() && (
+        (
+          resource.data.get("ownerId", "") == request.auth.uid
+          && resource.data.get("catalog", false) == false
+        )
+        || (
+          isCatalogAdmin()
+          && resource.data.get("catalog", false) == true
+        )
+      );
     }
   }
 }

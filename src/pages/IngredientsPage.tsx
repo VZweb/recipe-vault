@@ -14,6 +14,8 @@ import {
   X,
 } from "lucide-react";
 import { useIngredients } from "@/hooks/useIngredients";
+import { useAuth } from "@/contexts/AuthContext";
+import { refreshAuthIdToken } from "@/lib/firebase";
 import { normalizeText } from "@/lib/normalize";
 import { addPantryItem, fetchPantryItems } from "@/lib/firestore";
 import type { PantryItem } from "@/types/pantry";
@@ -35,7 +37,8 @@ interface EditState {
 }
 
 export function IngredientsPage() {
-  const { ingredients, loading, add, update, remove } = useIngredients();
+  const { user, catalogAdmin } = useAuth();
+  const { ingredients, loading, add, addCatalog, update, remove } = useIngredients();
   const [newName, setNewName] = useState("");
   const [newNameGr, setNewNameGr] = useState("");
   const [newCategory, setNewCategory] =
@@ -49,6 +52,18 @@ export function IngredientsPage() {
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [duplicateMatch, setDuplicateMatch] = useState<MasterIngredient | null>(null);
+  const [addAsCatalog, setAddAsCatalog] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (catalogAdmin) setAddAsCatalog(true);
+    else setAddAsCatalog(false);
+  }, [catalogAdmin]);
+
+  useEffect(() => {
+    if (!catalogAdmin || !user) return;
+    void user.getIdToken(true);
+  }, [catalogAdmin, user]);
 
   const [pantryIds, setPantryIds] = useState<Set<string>>(new Set());
   const [addedToPantry, setAddedToPantry] = useState<Set<string>>(new Set());
@@ -119,18 +134,28 @@ export function IngredientsPage() {
 
   const commitAdd = async () => {
     setSubmitting(true);
+    setFormError(null);
     try {
-      await add({
+      const payload = {
         name: newName.trim(),
         nameGr: newNameGr.trim(),
         aliases: newAliases,
         category: newCategory,
-      });
+      };
+      if (catalogAdmin && addAsCatalog) {
+        await addCatalog(payload);
+      } else {
+        await add(payload);
+      }
       setNewName("");
       setNewNameGr("");
       setNewAliases([]);
       setNewAliasInput("");
       setNewCategory("Other");
+    } catch (e) {
+      const msg =
+        e instanceof Error ? e.message : "Could not save. Check the console or try again.";
+      setFormError(msg);
     } finally {
       setSubmitting(false);
     }
@@ -139,6 +164,7 @@ export function IngredientsPage() {
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName.trim()) return;
+    setFormError(null);
 
     const existing = findDuplicate(newName.trim(), newNameGr.trim(), newAliases);
     if (existing) {
@@ -150,6 +176,7 @@ export function IngredientsPage() {
   };
 
   const startEditing = (item: MasterIngredient) => {
+    if (item.isCatalog && !catalogAdmin) return;
     setEditingId(item.id);
     setEditState({
       name: item.name,
@@ -175,9 +202,13 @@ export function IngredientsPage() {
   };
 
   const saveEdit = async (item: MasterIngredient) => {
-    if (!editState || !editState.name.trim()) return;
+    if ((item.isCatalog && !catalogAdmin) || !editState || !editState.name.trim()) return;
     setSaving(true);
+    setFormError(null);
     try {
+      if (item.isCatalog && catalogAdmin) {
+        await refreshAuthIdToken();
+      }
       await update(item.id, {
         name: editState.name.trim(),
         nameGr: editState.nameGr.trim(),
@@ -185,6 +216,10 @@ export function IngredientsPage() {
         category: editState.category,
       });
       cancelEditing();
+    } catch (e) {
+      setFormError(
+        e instanceof Error ? e.message : "Could not update. Try again or refresh the page."
+      );
     } finally {
       setSaving(false);
     }
@@ -192,8 +227,20 @@ export function IngredientsPage() {
 
   const handleDelete = async () => {
     if (!deleteId) return;
-    await remove(deleteId);
-    setDeleteId(null);
+    setFormError(null);
+    try {
+      const row = ingredients.find((i) => i.id === deleteId);
+      if (row?.isCatalog && catalogAdmin) {
+        await refreshAuthIdToken();
+      }
+      await remove(deleteId);
+      setDeleteId(null);
+    } catch (e) {
+      setFormError(
+        e instanceof Error ? e.message : "Could not delete. Try again or refresh the page."
+      );
+      setDeleteId(null);
+    }
   };
 
   const toggleCategory = (cat: string) => {
@@ -238,8 +285,9 @@ export function IngredientsPage() {
           Ingredient Catalog
         </h1>
         <p className="mt-1 text-sm text-stone-500">
-          Master list of ingredients. Recipes and pantry items link here for
-          consistent matching.
+          Shared catalog entries are the same for everyone; only the catalog
+          administrator can change them. Anyone can add personal ingredients.
+          Recipes and pantry link here for matching.
         </p>
       </div>
 
@@ -268,6 +316,11 @@ export function IngredientsPage() {
         onSubmit={handleAdd}
         className="space-y-3 rounded-xl border border-stone-200 bg-white p-4"
       >
+        {formError && (
+          <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+            {formError}
+          </p>
+        )}
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="flex-1">
             <IngredientAutocomplete
@@ -303,6 +356,18 @@ export function IngredientsPage() {
             ))}
           </select>
         </div>
+
+        {catalogAdmin && (
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-stone-700">
+            <input
+              type="checkbox"
+              checked={addAsCatalog}
+              onChange={(e) => setAddAsCatalog(e.target.checked)}
+              className="rounded border-stone-300 text-brand-600 focus:ring-brand-500/30"
+            />
+            <span>Add to shared catalog (visible to all users)</span>
+          </label>
+        )}
 
         {/* Aliases */}
         <div className="flex flex-wrap items-center gap-2">
@@ -551,6 +616,11 @@ export function IngredientsPage() {
                         >
                           <div className="min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
+                              {item.isCatalog && (
+                                <span className="rounded bg-stone-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-stone-500">
+                                  Catalog
+                                </span>
+                              )}
                               <span className="text-sm font-medium text-stone-800">
                                 {item.name}
                               </span>
@@ -593,20 +663,24 @@ export function IngredientsPage() {
                                 Pantry
                               </button>
                             )}
-                            <button
-                              onClick={() => startEditing(item)}
-                              className="p-1 text-stone-400 hover:text-brand-600 transition-colors"
-                              title="Edit"
-                            >
-                              <Pencil size={14} />
-                            </button>
-                            <button
-                              onClick={() => setDeleteId(item.id)}
-                              className="p-1 text-stone-400 hover:text-red-500 transition-colors"
-                              title="Delete"
-                            >
-                              <Trash2 size={16} />
-                            </button>
+                            {(!item.isCatalog || catalogAdmin) && (
+                              <>
+                                <button
+                                  onClick={() => startEditing(item)}
+                                  className="p-1 text-stone-400 hover:text-brand-600 transition-colors"
+                                  title="Edit"
+                                >
+                                  <Pencil size={14} />
+                                </button>
+                                <button
+                                  onClick={() => setDeleteId(item.id)}
+                                  className="p-1 text-stone-400 hover:text-red-500 transition-colors"
+                                  title="Delete"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </>
+                            )}
                           </div>
                         </div>
                       )

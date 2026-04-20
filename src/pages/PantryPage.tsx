@@ -24,6 +24,7 @@ import {
   deletePantryItem,
 } from "@/lib/firestore";
 import { uploadPantryImage, deletePantryImage } from "@/lib/storage";
+import { useAuth } from "@/contexts/AuthContext";
 import { useIngredients } from "@/hooks/useIngredients";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -50,6 +51,7 @@ interface EditState {
 }
 
 export function PantryPage() {
+  const { user } = useAuth();
   const [items, setItems] = useState<PantryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [newName, setNewName] = useState("");
@@ -149,7 +151,7 @@ export function PantryPage() {
 
       let imageUrl: string | null = null;
       if (newImageFile) {
-        imageUrl = await uploadPantryImage(id, newImageFile);
+        imageUrl = await uploadPantryImage(user!.uid, id, newImageFile);
         await updatePantryItem(id, { imageUrl });
       } else if (newImageUrl.trim()) {
         imageUrl = newImageUrl.trim();
@@ -323,7 +325,11 @@ export function PantryPage() {
         newImageUrl = null;
       } else if (editState.imageFile) {
         if (item.imageUrl) await deletePantryImage(item.imageUrl);
-        newImageUrl = await uploadPantryImage(item.id, editState.imageFile);
+        newImageUrl = await uploadPantryImage(
+          user!.uid,
+          item.id,
+          editState.imageFile
+        );
         updates.imageUrl = newImageUrl;
       } else if (editState.imageUrlInput.trim()) {
         if (item.imageUrl) await deletePantryImage(item.imageUrl);

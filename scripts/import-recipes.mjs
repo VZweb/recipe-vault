@@ -6,7 +6,7 @@
  * the recipe-vault schema) and writes each recipe into Firestore.
  *
  * Usage:
- *   node import-recipes.mjs <parsed-recipes.json> [--dry-run]
+ *   node import-recipes.mjs <parsed-recipes.json> --owner-uid=FIREBASE_AUTH_UID [--dry-run]
  *
  * Requires a service account key at scripts/service-account.json
  * (or set GOOGLE_APPLICATION_CREDENTIALS env var to the key path).
@@ -27,21 +27,31 @@ import { getFirestore, Timestamp } from "firebase-admin/firestore";
 const args = process.argv.slice(2);
 const dryRun = args.includes("--dry-run");
 const jsonPath = args.find((a) => !a.startsWith("--"));
+const ownerArg = args.find((a) => a.startsWith("--owner-uid="));
+const ownerUid = ownerArg?.slice("--owner-uid=".length)?.trim() ?? "";
 
 if (!jsonPath || args.includes("--help")) {
   console.log(`
 Usage:
-  node import-recipes.mjs <parsed-recipes.json> [--dry-run]
+  node import-recipes.mjs <parsed-recipes.json> --owner-uid=FIREBASE_AUTH_UID [--dry-run]
 
 Options:
-  --dry-run   Validate & log without writing to Firestore
-  --help      Show this help
+  --owner-uid  Firebase Auth uid of the account that should own imported recipes and new tags
+  --dry-run    Validate & log without writing to Firestore
+  --help       Show this help
 
 Requires:
   scripts/service-account.json  (Firebase Admin service account key)
   Generate at: Firebase Console → Project Settings → Service Accounts
 `);
   process.exit(0);
+}
+
+if (!dryRun && !ownerUid) {
+  console.error(
+    "Error: --owner-uid=FIREBASE_AUTH_UID is required when writing (omit only with --dry-run)."
+  );
+  process.exit(1);
 }
 
 if (!fs.existsSync(jsonPath)) {
@@ -81,8 +91,8 @@ const tagsCol = db.collection("tags");
 // Tag resolution: match Keep labels to existing tags or create new ones
 // ---------------------------------------------------------------------------
 
-async function loadExistingTags() {
-  const snap = await tagsCol.orderBy("name").get();
+async function loadExistingTags(uid) {
+  const snap = await tagsCol.where("ownerId", "==", uid).orderBy("name").get();
   const tags = new Map();
   snap.docs.forEach((d) => {
     tags.set(d.data().name.toLowerCase(), { id: d.id, name: d.data().name });
@@ -96,7 +106,7 @@ const TAG_COLORS = [
 ];
 let colorIdx = 0;
 
-async function resolveTagIds(labelNames, existingTags) {
+async function resolveTagIds(labelNames, existingTags, uid) {
   const ids = [];
   for (const name of labelNames) {
     const key = name.toLowerCase();
@@ -106,7 +116,12 @@ async function resolveTagIds(labelNames, existingTags) {
       const color = TAG_COLORS[colorIdx % TAG_COLORS.length];
       colorIdx++;
       if (!dryRun) {
-        const docRef = await tagsCol.add({ name, color });
+        const docRef = await tagsCol.add({
+          name,
+          color,
+          category: "Other",
+          ownerId: uid,
+        });
         existingTags.set(key, { id: docRef.id, name });
         ids.push(docRef.id);
         console.log(`  Created tag: "${name}" (${docRef.id})`);
@@ -133,8 +148,12 @@ if (!Array.isArray(recipes)) {
 console.log(`\nLoaded ${recipes.length} recipe(s) from ${jsonPath}`);
 if (dryRun) console.log("** DRY RUN — nothing will be written to Firestore **\n");
 
-const existingTags = await loadExistingTags();
-console.log(`Found ${existingTags.size} existing tag(s) in Firestore.\n`);
+const existingTags = ownerUid
+  ? await loadExistingTags(ownerUid)
+  : new Map();
+console.log(
+  `Found ${existingTags.size} existing tag(s) for this owner in Firestore.\n`
+);
 
 let imported = 0;
 let errors = 0;
@@ -152,7 +171,7 @@ for (let i = 0; i < recipes.length; i++) {
   try {
     const tagIds =
       r.tags && r.tags.length > 0
-        ? await resolveTagIds(r.tags, existingTags)
+        ? await resolveTagIds(r.tags, existingTags, ownerUid || "dry-run")
         : [];
 
     const now = Timestamp.now();
@@ -184,6 +203,7 @@ for (let i = 0; i < recipes.length; i++) {
       cookedCount: 0,
       createdAt: now,
       updatedAt: now,
+      ownerId: ownerUid,
     };
 
     const linked = doc.ingredients.filter((i) => i.masterIngredientId).length;

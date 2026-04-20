@@ -6,9 +6,12 @@ import {
   Egg,
   Home,
   Layers,
+  LogOut,
   Package,
   Search,
 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/Button";
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -28,19 +31,21 @@ const navItems = [
 ];
 
 export function AppLayout() {
+  const { user, signOut } = useAuth();
+
   return (
     <div className="min-h-screen flex flex-col">
       <ScrollToTop />
       {/* Top header */}
       <header className="sticky top-0 z-30 border-b border-stone-200 bg-white/80 backdrop-blur-md">
-        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
+        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-2 px-4">
           <NavLink to="/" className="flex items-center gap-2 font-bold text-brand-700">
             <ChefHat size={24} />
             <span className="font-heading text-lg">Recipe Vault</span>
           </NavLink>
 
           {/* Desktop nav */}
-          <nav className="hidden md:flex items-center gap-1">
+          <nav className="hidden md:flex flex-1 items-center justify-center gap-1 min-w-0">
             {navItems.map(({ to, icon: Icon, label }) => (
               <NavLink
                 key={to}
@@ -60,13 +65,41 @@ export function AppLayout() {
             ))}
           </nav>
 
-          <NavLink
-            to="/recipes?search=true"
-            className="rounded-lg p-2 text-stone-500 hover:bg-stone-100 hover:text-stone-700 transition-colors md:hidden"
-            aria-label="Search"
-          >
-            <Search size={20} />
-          </NavLink>
+          <div className="hidden md:flex items-center gap-2 shrink-0">
+            <span className="max-w-[140px] truncate text-xs text-stone-500" title={user?.email ?? ""}>
+              {user?.email}
+            </span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="!px-2"
+              onClick={() => void signOut()}
+              aria-label="Sign out"
+            >
+              <LogOut size={18} />
+            </Button>
+          </div>
+
+          <div className="flex items-center gap-1 md:hidden">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="!px-2"
+              onClick={() => void signOut()}
+              aria-label="Sign out"
+            >
+              <LogOut size={18} />
+            </Button>
+            <NavLink
+              to="/recipes?search=true"
+              className="rounded-lg p-2 text-stone-500 hover:bg-stone-100 hover:text-stone-700 transition-colors"
+              aria-label="Search"
+            >
+              <Search size={20} />
+            </NavLink>
+          </div>
         </div>
       </header>
 
