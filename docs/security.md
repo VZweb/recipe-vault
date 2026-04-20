@@ -4,6 +4,8 @@
 
 The app uses **Firebase Authentication** (email/password and Google). Signed-in users access only their own **vault** data: `recipes`, `tags`, `categories`, and `pantry` documents include an **`ownerId`** field (Firebase Auth `uid`) that must match `request.auth.uid` in Firestore rules.
 
+The **`userProfiles`** collection stores one document per user (`userProfiles/{uid}`) for account metadata (e.g. default tags/categories seeding). Rules restrict read/write to `request.auth.uid == userId` (the document id must match the signed-in user).
+
 ### Ingredients catalog
 
 Documents in **`ingredients`** are either:

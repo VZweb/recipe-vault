@@ -10,10 +10,14 @@ import {
   query,
   orderBy,
   where,
+  limit,
   increment,
   Timestamp,
+  runTransaction,
+  setDoc,
   type DocumentData,
 } from "firebase/firestore";
+import { DEFAULT_CATEGORIES, DEFAULT_TAGS } from "@/data/defaultVaultTemplates";
 import { db, refreshAuthIdToken, requireUid } from "./firebase";
 import { deleteRecipeImage } from "./storage";
 import type { Recipe, RecipeFormData } from "@/types/recipe";
@@ -27,6 +31,7 @@ const tagsCol = collection(db, "tags");
 const categoriesCol = collection(db, "categories");
 const pantryCol = collection(db, "pantry");
 const ingredientsCol = collection(db, "ingredients");
+const userProfilesCol = collection(db, "userProfiles");
 
 function toDate(ts: Timestamp | Date | undefined): Date {
   if (ts instanceof Timestamp) return ts.toDate();
@@ -291,6 +296,72 @@ export async function deleteCategory(id: string): Promise<void> {
   } else {
     await deleteDoc(doc(db, "categories", id));
   }
+}
+
+/**
+ * One-time per account: copies default tags and categories when the vault has none
+ * (or only one side missing). Writes `userProfiles/{uid}.vaultDefaultsApplied`.
+ * @returns true if new documents were created (caller may invalidate tag/category queries).
+ */
+export async function ensureUserVaultDefaults(): Promise<boolean> {
+  const uid = requireUid();
+  const profileRef = doc(userProfilesCol, uid);
+  const profileSnap = await getDoc(profileRef);
+  if (profileSnap.exists() && profileSnap.data()?.vaultDefaultsApplied === true) {
+    return false;
+  }
+
+  const [tagProbe, catProbe] = await Promise.all([
+    getDocs(query(tagsCol, where("ownerId", "==", uid), limit(1))),
+    getDocs(query(categoriesCol, where("ownerId", "==", uid), limit(1))),
+  ]);
+  const hasTags = !tagProbe.empty;
+  const hasCats = !catProbe.empty;
+
+  if (hasTags && hasCats) {
+    if (!profileSnap.exists()) {
+      await setDoc(profileRef, { vaultDefaultsApplied: true }, { merge: true });
+    }
+    return false;
+  }
+
+  await runTransaction(db, async (transaction) => {
+    const p = await transaction.get(profileRef);
+    if (p.exists() && p.data()?.vaultDefaultsApplied === true) {
+      return;
+    }
+
+    if (!hasTags) {
+      for (const t of DEFAULT_TAGS) {
+        const ref = doc(tagsCol);
+        transaction.set(ref, {
+          name: t.name,
+          color: t.color,
+          category: t.category,
+          ownerId: uid,
+        });
+      }
+    }
+    if (!hasCats) {
+      for (const c of DEFAULT_CATEGORIES) {
+        const ref = doc(categoriesCol);
+        transaction.set(ref, {
+          name: c.name,
+          description: c.description,
+          icon: c.icon,
+          ownerId: uid,
+        });
+      }
+    }
+    transaction.set(
+      profileRef,
+      { vaultDefaultsApplied: true, seededAt: Timestamp.now() },
+      { merge: true }
+    );
+  });
+
+  const after = await getDoc(profileRef);
+  return after.exists() && after.data()?.vaultDefaultsApplied === true;
 }
 
 // --- Pantry ---

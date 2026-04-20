@@ -26,6 +26,7 @@ Collection names and mapping logic live in `src/lib/firestore.ts`.
 | `categories` | Recipe categories | `where("ownerId","==",uid)`, `orderBy("name")` |
 | `pantry` | Pantry items | `where("ownerId","==",uid)`, `orderBy("name")`, then client sort by category and name |
 | `ingredients` | Master ingredient catalog | Two queries merged in the client: `where("catalog","==",true)` and `where("ownerId","==",uid)`, each with `orderBy("name")` |
+| `userProfiles` | Per-user metadata | One document per uid (`userProfiles/{uid}`). Used to record `vaultDefaultsApplied` after starter tags/categories are copied for new accounts (`ensureUserVaultDefaults` in `firestore.ts`). |
 
 ### Recipe documents
 
@@ -45,6 +46,10 @@ Pantry items store **`ownerId`** and reference `masterIngredientId` (string). De
 ### Master ingredients
 
 Stored in the `ingredients` collection. **Catalog** rows (`catalog: true`) are shared defaults for every user; only accounts with the **`catalogAdmin`** Auth custom claim may create, update, or delete them from the client (see `scripts/set-catalog-admin-claim.mjs` and `firestore.rules`). **User** rows (`ownerId` set, `catalog: false`) are editable by that owner. `docToMasterIngredient` sets `isCatalog` for the UI.
+
+### Default tags and categories for new accounts
+
+Starter lists live in [`src/data/defaultVaultTemplates.ts`](../src/data/defaultVaultTemplates.ts). On sign-in, `ensureUserVaultDefaults()` runs once per account (see `userProfiles`): if the user has **no** tags and/or **no** categories, it copies the templates into `tags` / `categories` with that user’s `ownerId`. Existing users who already have both tags and categories only get `userProfiles` marked so the seed does not run again.
 
 ## TypeScript types
 

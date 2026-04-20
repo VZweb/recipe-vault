@@ -18,6 +18,8 @@ import {
   type User,
 } from "firebase/auth";
 import { useQueryClient } from "@tanstack/react-query";
+import { ensureUserVaultDefaults } from "@/lib/firestore";
+import { queryKeys } from "@/lib/queryKeys";
 import { auth } from "@/lib/firebase";
 
 type AuthContextValue = {
@@ -72,6 +74,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       cancelled = true;
     };
   }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    void ensureUserVaultDefaults()
+      .then((seeded) => {
+        if (cancelled || !seeded) return;
+        queryClient.invalidateQueries({ queryKey: queryKeys.tags(user.uid) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.categories(user.uid) });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [user, queryClient]);
 
   const signInWithEmail = useCallback(async (email: string, password: string) => {
     await signInWithEmailAndPassword(auth, email.trim(), password);
