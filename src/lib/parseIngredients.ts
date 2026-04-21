@@ -202,6 +202,7 @@ export function parseIngredientText(
         unit: "",
         sortOrder,
         masterIngredientId: null,
+        masterIngredientScope: null,
         note: "",
         isSection: true,
       });
@@ -218,6 +219,11 @@ export function parseIngredientText(
       unit: parsed.unit,
       sortOrder,
       masterIngredientId: match?.id ?? null,
+      masterIngredientScope: match
+        ? match.isCatalog === false
+          ? "custom"
+          : "catalog"
+        : null,
       note: parsed.note,
       isSection: false,
     });

@@ -2,9 +2,8 @@
 /**
  * audit-unlinked.mjs
  *
- * Scans Firestore for pantry items and recipe ingredients that are
- * missing a masterIngredientId link. Reports findings so they can
- * be resolved manually or via the app UI.
+ * Scans Firestore (user-scoped pantry + recipes) for lines missing
+ * masterIngredientId. Uses collection groups `pantry` and `recipes`.
  *
  * Usage:
  *   node scripts/audit-unlinked.mjs
@@ -30,13 +29,17 @@ const db = getFirestore(app);
 async function audit() {
   console.log("=== Unlinked Items Audit ===\n");
 
-  // --- Pantry ---
-  const pantrySnap = await db.collection("pantry").get();
+  const pantrySnap = await db.collectionGroup("pantry").get();
   const unlinkedPantry = [];
   for (const doc of pantrySnap.docs) {
     const data = doc.data();
     if (!data.masterIngredientId) {
-      unlinkedPantry.push({ id: doc.id, name: data.name, category: data.category });
+      unlinkedPantry.push({
+        path: doc.ref.path,
+        id: doc.id,
+        name: data.name,
+        category: data.category,
+      });
     }
   }
 
@@ -44,13 +47,12 @@ async function audit() {
   if (unlinkedPantry.length > 0) {
     console.log("  Unlinked pantry items:");
     for (const item of unlinkedPantry) {
-      console.log(`    - [${item.id}] "${item.name}" (${item.category})`);
+      console.log(`    - ${item.path} "${item.name}" (${item.category})`);
     }
   }
   console.log();
 
-  // --- Recipes ---
-  const recipesSnap = await db.collection("recipes").get();
+  const recipesSnap = await db.collectionGroup("recipes").get();
   let totalIngredients = 0;
   let unlinkedIngredients = 0;
   const recipesWithUnlinked = [];
@@ -71,6 +73,7 @@ async function audit() {
 
     if (unlinked.length > 0) {
       recipesWithUnlinked.push({
+        path: doc.ref.path,
         id: doc.id,
         title: data.title,
         total: ingredients.filter((i) => !i.isSection).length,
@@ -86,7 +89,7 @@ async function audit() {
     console.log(`  ${recipesWithUnlinked.length} recipe(s) have unlinked ingredients:`);
     for (const r of recipesWithUnlinked) {
       console.log(
-        `    - [${r.id}] "${r.title}" — ${r.unlinked.length}/${r.total} unlinked:`
+        `    - ${r.path} "${r.title}" — ${r.unlinked.length}/${r.total} unlinked:`
       );
       for (const name of r.unlinked) {
         console.log(`        • ${name}`);

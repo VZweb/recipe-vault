@@ -17,13 +17,34 @@ import { IngredientAutocomplete } from "@/components/ui/IngredientAutocomplete";
 import { IngredientQuickAdd } from "@/components/ui/IngredientQuickAdd";
 import { TAG_CATEGORIES } from "@/types/tag";
 import type { Ingredient, Step, RecipeFormData } from "@/types/recipe";
+import { masterScopeFromMasterIngredient } from "@/lib/ingredientRef";
 
 function emptyIngredient(sortOrder: number): Ingredient {
-  return { name: "", nameSecondary: "", quantity: null, unit: "", sortOrder, masterIngredientId: null, note: "", isSection: false };
+  return {
+    name: "",
+    nameSecondary: "",
+    quantity: null,
+    unit: "",
+    sortOrder,
+    masterIngredientId: null,
+    masterIngredientScope: null,
+    note: "",
+    isSection: false,
+  };
 }
 
 function emptySection(sortOrder: number): Ingredient {
-  return { name: "", nameSecondary: "", quantity: null, unit: "", sortOrder, masterIngredientId: null, note: "", isSection: true };
+  return {
+    name: "",
+    nameSecondary: "",
+    quantity: null,
+    unit: "",
+    sortOrder,
+    masterIngredientId: null,
+    masterIngredientScope: null,
+    note: "",
+    isSection: true,
+  };
 }
 
 function emptyStep(sortOrder: number): Step {
@@ -689,7 +710,11 @@ export function RecipeEditorPage() {
                       : "border-stone-300"
                   }`}
                   onChange={(v) => {
-                    updateIngredient(idx, { name: v, masterIngredientId: null });
+                    updateIngredient(idx, {
+                      name: v,
+                      masterIngredientId: null,
+                      masterIngredientScope: null,
+                    });
                     if (quickAddIdx === idx) setQuickAddIdx(null);
                   }}
                   onSelect={(mi) => {
@@ -697,6 +722,7 @@ export function RecipeEditorPage() {
                       name: mi.name,
                       nameSecondary: mi.nameGr,
                       masterIngredientId: mi.id,
+                      masterIngredientScope: masterScopeFromMasterIngredient(mi),
                     });
                     if (quickAddIdx === idx) setQuickAddIdx(null);
                   }}
@@ -766,6 +792,7 @@ export function RecipeEditorPage() {
                       name: mi.name,
                       nameSecondary: mi.nameGr,
                       masterIngredientId: mi.id,
+                      masterIngredientScope: "catalog",
                     });
                     setQuickAddIdx(null);
                   }}
@@ -880,7 +907,13 @@ export function RecipeEditorPage() {
                         if (i.isSection) return i;
                         if (nsIdx === pasteReviewQuickAddIdx) {
                           nsIdx++;
-                          return { ...i, name: mi.name, nameSecondary: mi.nameGr, masterIngredientId: mi.id };
+                          return {
+                            ...i,
+                            name: mi.name,
+                            nameSecondary: mi.nameGr,
+                            masterIngredientId: mi.id,
+                            masterIngredientScope: "catalog",
+                          };
                         }
                         nsIdx++;
                         return i;

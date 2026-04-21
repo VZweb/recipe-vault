@@ -84,15 +84,21 @@ const serviceAccount = JSON.parse(fs.readFileSync(saPath, "utf-8"));
 initializeApp({ credential: cert(serviceAccount) });
 const db = getFirestore();
 db.settings({ preferRest: true });
-const recipesCol = db.collection("recipes");
-const tagsCol = db.collection("tags");
+
+function userTagsCol(uid) {
+  return db.collection("users").doc(uid).collection("tags");
+}
+
+function userRecipesCol(uid) {
+  return db.collection("users").doc(uid).collection("recipes");
+}
 
 // ---------------------------------------------------------------------------
 // Tag resolution: match Keep labels to existing tags or create new ones
 // ---------------------------------------------------------------------------
 
 async function loadExistingTags(uid) {
-  const snap = await tagsCol.where("ownerId", "==", uid).orderBy("name").get();
+  const snap = await userTagsCol(uid).orderBy("name").get();
   const tags = new Map();
   snap.docs.forEach((d) => {
     tags.set(d.data().name.toLowerCase(), { id: d.id, name: d.data().name });
@@ -116,11 +122,10 @@ async function resolveTagIds(labelNames, existingTags, uid) {
       const color = TAG_COLORS[colorIdx % TAG_COLORS.length];
       colorIdx++;
       if (!dryRun) {
-        const docRef = await tagsCol.add({
+        const docRef = await userTagsCol(uid).add({
           name,
           color,
           category: "Other",
-          ownerId: uid,
         });
         existingTags.set(key, { id: docRef.id, name });
         ids.push(docRef.id);
@@ -192,6 +197,7 @@ for (let i = 0; i < recipes.length; i++) {
         unit: ing.unit || "",
         sortOrder: ing.sortOrder ?? idx,
         masterIngredientId: ing.masterIngredientId ?? null,
+        masterIngredientScope: ing.masterIngredientScope ?? null,
         note: ing.note || "",
         isSection: ing.isSection ?? false,
       })),
@@ -203,7 +209,6 @@ for (let i = 0; i < recipes.length; i++) {
       cookedCount: 0,
       createdAt: now,
       updatedAt: now,
-      ownerId: ownerUid,
     };
 
     const linked = doc.ingredients.filter((i) => i.masterIngredientId).length;
@@ -215,7 +220,7 @@ for (let i = 0; i < recipes.length; i++) {
           `(${ingStats}, ${doc.steps.length} steps)`
       );
     } else {
-      const ref = await recipesCol.add(doc);
+      const ref = await userRecipesCol(ownerUid).add(doc);
       console.log(
         `${label} Imported: "${r.title}" → ${ref.id} ` +
           `(${ingStats}, ${doc.steps.length} steps)`

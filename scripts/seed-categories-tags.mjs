@@ -2,12 +2,11 @@
 /**
  * seed-categories-tags.mjs
  *
- * Seeds the Firestore `categories` and `tags` collections with a curated
- * default set. Existing documents are left untouched — only new entries
- * (matched by name) are created.
+ * Seeds `users/{uid}/categories` and `users/{uid}/tags` with a curated default set.
+ * Existing documents are left untouched — only new entries (matched by name) are created.
  *
  * Usage:
- *   node seed-categories-tags.mjs [--dry-run]
+ *   node seed-categories-tags.mjs --owner-uid=FIREBASE_UID [--dry-run]
  *
  * Requires a service account key at scripts/service-account.json
  * (or set GOOGLE_APPLICATION_CREDENTIALS env var to the key path).
@@ -19,6 +18,13 @@ import { getFirestore } from "firebase-admin/firestore";
 
 const args = process.argv.slice(2);
 const dryRun = args.includes("--dry-run");
+const ownerArg = args.find((a) => a.startsWith("--owner-uid="));
+const ownerUid = ownerArg?.slice("--owner-uid=".length)?.trim() ?? "";
+
+if (!ownerUid) {
+  console.error("Required: --owner-uid=FIREBASE_AUTH_UID");
+  process.exit(1);
+}
 
 const saPath =
   process.env.GOOGLE_APPLICATION_CREDENTIALS ||
@@ -112,8 +118,8 @@ const DEFAULT_TAGS = [
 // Seed logic
 // ---------------------------------------------------------------------------
 
-async function seedCollection(colName, items, fields) {
-  const col = db.collection(colName);
+async function seedCollection(colRef, colName, items, fields) {
+  const col = colRef;
   const snap = await col.get();
   const existingNames = new Set(snap.docs.map((d) => d.data().name));
 
@@ -149,8 +155,8 @@ async function seedCollection(colName, items, fields) {
  * Back-fill the `category` field on existing tag documents that are missing it.
  * Matches by name against DEFAULT_TAGS; unmatched docs get "Other".
  */
-async function backfillTagCategories() {
-  const col = db.collection("tags");
+async function backfillTagCategories(tagsCol) {
+  const col = tagsCol;
   const snap = await col.get();
   const nameToCategory = new Map(DEFAULT_TAGS.map((t) => [t.name, t.category]));
   const toUpdate = [];
@@ -185,11 +191,18 @@ async function backfillTagCategories() {
 }
 
 async function main() {
-  console.log(`\nSeeding Firestore${dryRun ? " (DRY RUN)" : ""}...\n`);
+  console.log(`\nSeeding Firestore for users/${ownerUid}${dryRun ? " (DRY RUN)" : ""}...\n`);
 
-  await seedCollection("categories", DEFAULT_CATEGORIES, ["name", "icon", "description"]);
-  await seedCollection("tags", DEFAULT_TAGS, ["name", "color", "category"]);
-  await backfillTagCategories();
+  const categoriesCol = db.collection("users").doc(ownerUid).collection("categories");
+  const tagsCol = db.collection("users").doc(ownerUid).collection("tags");
+
+  await seedCollection(categoriesCol, "categories", DEFAULT_CATEGORIES, [
+    "name",
+    "icon",
+    "description",
+  ]);
+  await seedCollection(tagsCol, "tags", DEFAULT_TAGS, ["name", "color", "category"]);
+  await backfillTagCategories(tagsCol);
 
   console.log("\nDone.\n");
 }

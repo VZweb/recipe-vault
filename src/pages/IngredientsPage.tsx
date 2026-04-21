@@ -18,6 +18,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { refreshAuthIdToken } from "@/lib/firebase";
 import { normalizeText } from "@/lib/normalize";
 import { addPantryItem, fetchPantryItems } from "@/lib/firestore";
+import { ingredientLinkKey, masterScopeFromMasterIngredient } from "@/lib/ingredientRef";
 import type { PantryItem } from "@/types/pantry";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -50,7 +51,10 @@ export function IngredientsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editState, setEditState] = useState<EditState | null>(null);
   const [saving, setSaving] = useState(false);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: string;
+    isCatalog: boolean;
+  } | null>(null);
   const [duplicateMatch, setDuplicateMatch] = useState<MasterIngredient | null>(null);
   const [addAsCatalog, setAddAsCatalog] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -65,12 +69,20 @@ export function IngredientsPage() {
     void user.getIdToken(true);
   }, [catalogAdmin, user]);
 
-  const [pantryIds, setPantryIds] = useState<Set<string>>(new Set());
+  const [pantryIds, setPantryIds] = useState<Set<string>>(new Set()); // ingredientLinkKey values
   const [addedToPantry, setAddedToPantry] = useState<Set<string>>(new Set());
 
   const loadPantryIds = useCallback(async () => {
     const items = await fetchPantryItems();
-    setPantryIds(new Set(items.map((i: PantryItem) => i.masterIngredientId).filter(Boolean) as string[]));
+    setPantryIds(
+      new Set(
+        items
+          .map((i: PantryItem) =>
+            ingredientLinkKey(i.masterIngredientId, i.masterIngredientScope)
+          )
+          .filter((k): k is string => k !== null)
+      )
+    );
   }, []);
 
   useEffect(() => {
@@ -88,10 +100,12 @@ export function IngredientsPage() {
       isStaple: false,
       imageUrl: null,
       masterIngredientId: item.id,
+      masterIngredientScope: masterScopeFromMasterIngredient(item),
       note: "",
     });
-    setPantryIds((prev) => new Set(prev).add(item.id));
-    setAddedToPantry((prev) => new Set(prev).add(item.id));
+    const pk = ingredientLinkKey(item.id, masterScopeFromMasterIngredient(item))!;
+    setPantryIds((prev) => new Set(prev).add(pk));
+    setAddedToPantry((prev) => new Set(prev).add(pk));
   };
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -209,12 +223,16 @@ export function IngredientsPage() {
       if (item.isCatalog && catalogAdmin) {
         await refreshAuthIdToken();
       }
-      await update(item.id, {
-        name: editState.name.trim(),
-        nameGr: editState.nameGr.trim(),
-        aliases: editState.aliases,
-        category: editState.category,
-      });
+      await update(
+        item.id,
+        {
+          name: editState.name.trim(),
+          nameGr: editState.nameGr.trim(),
+          aliases: editState.aliases,
+          category: editState.category,
+        },
+        !!item.isCatalog
+      );
       cancelEditing();
     } catch (e) {
       setFormError(
@@ -226,20 +244,24 @@ export function IngredientsPage() {
   };
 
   const handleDelete = async () => {
-    if (!deleteId) return;
+    if (!deleteTarget) return;
     setFormError(null);
     try {
-      const row = ingredients.find((i) => i.id === deleteId);
+      const row = ingredients.find(
+        (i) =>
+          i.id === deleteTarget.id &&
+          Boolean(i.isCatalog) === deleteTarget.isCatalog
+      );
       if (row?.isCatalog && catalogAdmin) {
         await refreshAuthIdToken();
       }
-      await remove(deleteId);
-      setDeleteId(null);
+      await remove(deleteTarget.id, deleteTarget.isCatalog);
+      setDeleteTarget(null);
     } catch (e) {
       setFormError(
         e instanceof Error ? e.message : "Could not delete. Try again or refresh the page."
       );
-      setDeleteId(null);
+      setDeleteTarget(null);
     }
   };
 
@@ -645,13 +667,19 @@ export function IngredientsPage() {
                           </div>
 
                           <div className="flex items-center gap-2 flex-shrink-0">
-                            {pantryIds.has(item.id) ? (
+                            {pantryIds.has(
+                              ingredientLinkKey(item.id, masterScopeFromMasterIngredient(item))!
+                            ) ? (
                               <span
                                 className="flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-medium text-green-600"
                                 title="In pantry"
                               >
                                 <Check size={10} />
-                                {addedToPantry.has(item.id) ? "Added" : "In pantry"}
+                                {addedToPantry.has(
+                                  ingredientLinkKey(item.id, masterScopeFromMasterIngredient(item))!
+                                )
+                                  ? "Added"
+                                  : "In pantry"}
                               </span>
                             ) : (
                               <button
@@ -673,7 +701,12 @@ export function IngredientsPage() {
                                   <Pencil size={14} />
                                 </button>
                                 <button
-                                  onClick={() => setDeleteId(item.id)}
+                                  onClick={() =>
+                                    setDeleteTarget({
+                                      id: item.id,
+                                      isCatalog: !!item.isCatalog,
+                                    })
+                                  }
                                   className="p-1 text-stone-400 hover:text-red-500 transition-colors"
                                   title="Delete"
                                 >
@@ -700,13 +733,13 @@ export function IngredientsPage() {
       )}
 
       <ConfirmDialog
-        open={!!deleteId}
+        open={!!deleteTarget}
         title="Delete ingredient"
         message="Are you sure? Existing recipes and pantry items that reference this ingredient will fall back to text matching."
         confirmLabel="Delete"
         variant="danger"
         onConfirm={handleDelete}
-        onCancel={() => setDeleteId(null)}
+        onCancel={() => setDeleteTarget(null)}
       />
 
       <ConfirmDialog

@@ -18,12 +18,14 @@ import { useRecipe, useRecipeMutations } from "@/hooks/useRecipes";
 import { useTags } from "@/hooks/useTags";
 import { useCategories } from "@/hooks/useCategories";
 import { fetchPantryItems } from "@/lib/firestore";
+import { ingredientLinkKey } from "@/lib/ingredientRef";
 import { Button } from "@/components/ui/Button";
 import { TagChip } from "@/components/ui/TagChip";
 import { CategoryIcon } from "@/components/ui/CategoryIcon";
 import { Spinner } from "@/components/ui/Spinner";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import type { PantryItem } from "@/types/pantry";
+import type { MasterIngredientScope } from "@/types/ingredientRef";
 
 export function RecipeDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -58,16 +60,27 @@ export function RecipeDetailPage() {
     await incrementCooked(recipe.id);
   };
 
-  const pantryMasterIds = useMemo(
-    () => new Set(pantryItems.map((p) => p.masterIngredientId).filter(Boolean)),
+  const pantryLinkKeys = useMemo(
+    () =>
+      new Set(
+        pantryItems
+          .map((p) => ingredientLinkKey(p.masterIngredientId, p.masterIngredientScope))
+          .filter((k): k is string => k !== null)
+      ),
     [pantryItems]
   );
 
   const isInPantry = useCallback(
-    (_name: string, _nameSecondary?: string, masterIngredientId?: string | null) => {
-      return !!masterIngredientId && pantryMasterIds.has(masterIngredientId);
+    (
+      _name: string,
+      _nameSecondary: string | undefined,
+      masterIngredientId: string | null | undefined,
+      masterIngredientScope: MasterIngredientScope
+    ) => {
+      const k = ingredientLinkKey(masterIngredientId ?? null, masterIngredientScope);
+      return k !== null && pantryLinkKeys.has(k);
     },
-    [pantryMasterIds]
+    [pantryLinkKeys]
   );
 
   if (loading) {
@@ -296,7 +309,7 @@ export function RecipeDetailPage() {
             </h2>
             {pantryItems.length > 0 && (
               <span className="text-xs text-stone-400">
-                {recipe.ingredients.filter((ing) => !ing.isSection && isInPantry(ing.name, ing.nameSecondary, ing.masterIngredientId)).length}
+                {recipe.ingredients.filter((ing) => !ing.isSection && isInPantry(ing.name, ing.nameSecondary, ing.masterIngredientId, ing.masterIngredientScope)).length}
                 /{recipe.ingredients.filter((ing) => !ing.isSection).length} in pantry
               </span>
             )}
@@ -314,7 +327,7 @@ export function RecipeDetailPage() {
                     </li>
                   );
                 }
-                const inPantry = isInPantry(ing.name, ing.nameSecondary, ing.masterIngredientId);
+                const inPantry = isInPantry(ing.name, ing.nameSecondary, ing.masterIngredientId, ing.masterIngredientScope);
                 const checked = checkedIngredients.has(i);
                 const toggleChecked = () =>
                   setCheckedIngredients((prev) => {

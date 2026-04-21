@@ -2,11 +2,11 @@
 /**
  * delete-recipes.mjs
  *
- * Deletes all documents from the Firestore `recipes` collection.
- * Optionally also deletes orphaned tags created during a previous import.
+ * Deletes all documents in `users/{ownerUid}/recipes`.
+ * Optionally also deletes `users/{ownerUid}/tags`.
  *
  * Usage:
- *   node delete-recipes.mjs [--include-tags] [--dry-run]
+ *   node scripts/delete-recipes.mjs --owner-uid=FIREBASE_UID [--include-tags] [--dry-run]
  *
  * Requires a service account key at scripts/service-account.json
  */
@@ -16,21 +16,20 @@ import path from "node:path";
 import { initializeApp, cert } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 
-// ---------------------------------------------------------------------------
-// CLI
-// ---------------------------------------------------------------------------
-
 const args = process.argv.slice(2);
 const dryRun = args.includes("--dry-run");
 const includeTags = args.includes("--include-tags");
+const ownerArg = args.find((a) => a.startsWith("--owner-uid="));
+const ownerUid = ownerArg?.slice("--owner-uid=".length)?.trim() ?? "";
 
 if (args.includes("--help")) {
   console.log(`
 Usage:
-  node delete-recipes.mjs [--include-tags] [--dry-run]
+  node scripts/delete-recipes.mjs --owner-uid=FIREBASE_UID [--include-tags] [--dry-run]
 
 Options:
-  --include-tags  Also delete all documents in the 'tags' collection
+  --owner-uid     Required. Deletes recipes under users/{uid}/recipes
+  --include-tags  Also delete users/{uid}/tags
   --dry-run       Show what would be deleted without actually deleting
   --help          Show this help
 
@@ -40,9 +39,10 @@ Requires:
   process.exit(0);
 }
 
-// ---------------------------------------------------------------------------
-// Firebase Admin init
-// ---------------------------------------------------------------------------
+if (!ownerUid) {
+  console.error("Required: --owner-uid=FIREBASE_AUTH_UID");
+  process.exit(1);
+}
 
 const scriptDir = import.meta.dirname;
 const saPath =
@@ -50,13 +50,7 @@ const saPath =
   path.resolve(scriptDir, "service-account.json");
 
 if (!fs.existsSync(saPath)) {
-  console.error(
-    `Service account key not found at: ${saPath}\n\n` +
-      "To generate one:\n" +
-      "  1. Go to Firebase Console → Project Settings → Service Accounts\n" +
-      "  2. Click 'Generate new private key'\n" +
-      "  3. Save the downloaded file as scripts/service-account.json\n"
-  );
+  console.error(`Service account key not found at: ${saPath}`);
   process.exit(1);
 }
 
@@ -65,23 +59,19 @@ initializeApp({ credential: cert(serviceAccount) });
 const db = getFirestore();
 db.settings({ preferRest: true });
 
-// ---------------------------------------------------------------------------
-// Batch delete helper
-// ---------------------------------------------------------------------------
-
-async function deleteCollection(collectionName) {
-  const colRef = db.collection(collectionName);
+async function deleteSubcollection(uid, sub) {
+  const colRef = db.collection("users").doc(uid).collection(sub);
   const snap = await colRef.get();
 
   if (snap.empty) {
-    console.log(`  ${collectionName}: collection is empty, nothing to delete.`);
+    console.log(`  users/${uid}/${sub}: empty`);
     return 0;
   }
 
-  console.log(`  ${collectionName}: found ${snap.size} document(s).`);
+  console.log(`  users/${uid}/${sub}: found ${snap.size} document(s).`);
 
   if (dryRun) {
-    console.log(`  [dry-run] Would delete ${snap.size} document(s) from '${collectionName}'.`);
+    console.log(`  [dry-run] Would delete ${snap.size} document(s).`);
     return snap.size;
   }
 
@@ -96,15 +86,11 @@ async function deleteCollection(collectionName) {
     }
     await batch.commit();
     deleted += chunk.length;
-    console.log(`  ${collectionName}: deleted ${deleted}/${snap.size}`);
+    console.log(`  users/${uid}/${sub}: deleted ${deleted}/${snap.size}`);
   }
 
   return deleted;
 }
-
-// ---------------------------------------------------------------------------
-// Main
-// ---------------------------------------------------------------------------
 
 console.log(
   dryRun
@@ -114,10 +100,10 @@ console.log(
 
 let totalDeleted = 0;
 
-totalDeleted += await deleteCollection("recipes");
+totalDeleted += await deleteSubcollection(ownerUid, "recipes");
 
 if (includeTags) {
-  totalDeleted += await deleteCollection("tags");
+  totalDeleted += await deleteSubcollection(ownerUid, "tags");
 }
 
 console.log(

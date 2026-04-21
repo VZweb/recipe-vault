@@ -1,5 +1,4 @@
 import {
-  collection,
   doc,
   getDocs,
   getDoc,
@@ -20,23 +19,31 @@ import {
 import { DEFAULT_CATEGORIES, DEFAULT_TAGS } from "@/data/defaultVaultTemplates";
 import { db, refreshAuthIdToken, requireUid } from "./firebase";
 import { deleteRecipeImage } from "./storage";
+import type { MasterIngredientScope } from "@/types/ingredientRef";
 import type { Recipe, RecipeFormData } from "@/types/recipe";
 import type { Tag } from "@/types/tag";
 import type { Category } from "@/types/category";
 import type { PantryItem } from "@/types/pantry";
 import type { MasterIngredient } from "@/types/ingredient";
-
-const recipesCol = collection(db, "recipes");
-const tagsCol = collection(db, "tags");
-const categoriesCol = collection(db, "categories");
-const pantryCol = collection(db, "pantry");
-const ingredientsCol = collection(db, "ingredients");
-const userProfilesCol = collection(db, "userProfiles");
+import {
+  getIngredientCatalogCollection,
+  getUserCategoriesCollection,
+  getUserCustomIngredientsCollection,
+  getUserDocRef,
+  getUserPantryCollection,
+  getUserRecipesCollection,
+  getUserTagsCollection,
+} from "./firestorePaths";
 
 function toDate(ts: Timestamp | Date | undefined): Date {
   if (ts instanceof Timestamp) return ts.toDate();
   if (ts instanceof Date) return ts;
   return new Date();
+}
+
+function normalizeIngredientScope(raw: unknown): MasterIngredientScope {
+  if (raw === "catalog" || raw === "custom") return raw;
+  return null;
 }
 
 function docToRecipe(id: string, data: DocumentData): Recipe {
@@ -56,6 +63,7 @@ function docToRecipe(id: string, data: DocumentData): Recipe {
       ...ing,
       nameSecondary: ing.nameSecondary ?? "",
       masterIngredientId: ing.masterIngredientId ?? null,
+      masterIngredientScope: normalizeIngredientScope(ing.masterIngredientScope),
       note: (ing.note as string) ?? "",
       isSection: (ing.isSection as boolean) ?? false,
     })),
@@ -97,19 +105,31 @@ function docToPantryItem(id: string, data: DocumentData): PantryItem {
     isStaple: data.isStaple ?? false,
     imageUrl: data.imageUrl ?? null,
     masterIngredientId: data.masterIngredientId ?? "",
+    masterIngredientScope: normalizeIngredientScope(data.masterIngredientScope),
     note: data.note ?? "",
     addedAt: toDate(data.addedAt),
   };
 }
 
-function docToMasterIngredient(id: string, data: DocumentData): MasterIngredient {
+function docToCatalogIngredient(id: string, data: DocumentData): MasterIngredient {
   return {
     id,
     name: data.name ?? "",
     nameGr: data.nameGr ?? "",
     aliases: data.aliases ?? [],
     category: data.category ?? "Other",
-    isCatalog: data.catalog === true,
+    isCatalog: true,
+  };
+}
+
+function docToCustomIngredient(id: string, data: DocumentData): MasterIngredient {
+  return {
+    id,
+    name: data.name ?? "",
+    nameGr: data.nameGr ?? "",
+    aliases: data.aliases ?? [],
+    category: data.category ?? "Other",
+    isCatalog: false,
   };
 }
 
@@ -120,24 +140,18 @@ export async function fetchRecipes(
   categoryId?: string
 ): Promise<Recipe[]> {
   const uid = requireUid();
+  const recipesCol = getUserRecipesCollection(db, uid);
   let q;
 
   if (tagIds && tagIds.length > 0) {
-    // Firestore cannot AND multiple `array-contains` on `tags`. Use one tag to narrow
-    // the query, then require every selected tag on the client (AND semantics).
     q = query(
       recipesCol,
-      where("ownerId", "==", uid),
       where("tags", "array-contains", tagIds[0])
     );
   } else if (categoryId) {
-    q = query(
-      recipesCol,
-      where("ownerId", "==", uid),
-      where("categoryId", "==", categoryId)
-    );
+    q = query(recipesCol, where("categoryId", "==", categoryId));
   } else {
-    q = query(recipesCol, where("ownerId", "==", uid), orderBy("createdAt", "desc"));
+    q = query(recipesCol, orderBy("createdAt", "desc"));
   }
 
   const snap = await getDocs(q);
@@ -159,7 +173,8 @@ export async function fetchRecipes(
 }
 
 export async function fetchRecipe(id: string): Promise<Recipe | null> {
-  const snap = await getDoc(doc(db, "recipes", id));
+  const uid = requireUid();
+  const snap = await getDoc(doc(getUserRecipesCollection(db, uid), id));
   if (!snap.exists()) return null;
   return docToRecipe(snap.id, snap.data());
 }
@@ -167,9 +182,8 @@ export async function fetchRecipe(id: string): Promise<Recipe | null> {
 export async function createRecipe(data: RecipeFormData): Promise<string> {
   const uid = requireUid();
   const now = Timestamp.now();
-  const docRef = await addDoc(recipesCol, {
+  const docRef = await addDoc(getUserRecipesCollection(db, uid), {
     ...data,
-    ownerId: uid,
     createdAt: now,
     updatedAt: now,
   });
@@ -180,7 +194,8 @@ export async function updateRecipe(
   id: string,
   data: Partial<RecipeFormData>
 ): Promise<void> {
-  await updateDoc(doc(db, "recipes", id), {
+  const uid = requireUid();
+  await updateDoc(doc(getUserRecipesCollection(db, uid), id), {
     ...data,
     updatedAt: Timestamp.now(),
   });
@@ -188,7 +203,8 @@ export async function updateRecipe(
 
 export async function deleteRecipe(id: string): Promise<void> {
   const recipe = await fetchRecipe(id);
-  await deleteDoc(doc(db, "recipes", id));
+  const uid = requireUid();
+  await deleteDoc(doc(getUserRecipesCollection(db, uid), id));
 
   if (recipe?.imageUrls.length) {
     await Promise.allSettled(recipe.imageUrls.map(deleteRecipeImage));
@@ -196,7 +212,8 @@ export async function deleteRecipe(id: string): Promise<void> {
 }
 
 export async function incrementCookedCount(id: string): Promise<void> {
-  await updateDoc(doc(db, "recipes", id), {
+  const uid = requireUid();
+  await updateDoc(doc(getUserRecipesCollection(db, uid), id), {
     cookedCount: increment(1),
     updatedAt: Timestamp.now(),
   });
@@ -206,7 +223,7 @@ export async function incrementCookedCount(id: string): Promise<void> {
 
 export async function fetchTags(): Promise<Tag[]> {
   const uid = requireUid();
-  const q = query(tagsCol, where("ownerId", "==", uid), orderBy("name"));
+  const q = query(getUserTagsCollection(db, uid), orderBy("name"));
   const snap = await getDocs(q);
   return snap.docs.map((d) => docToTag(d.id, d.data()));
 }
@@ -217,7 +234,11 @@ export async function createTag(
   category: string = "Other"
 ): Promise<string> {
   const uid = requireUid();
-  const docRef = await addDoc(tagsCol, { name, color, category, ownerId: uid });
+  const docRef = await addDoc(getUserTagsCollection(db, uid), {
+    name,
+    color,
+    category,
+  });
   return docRef.id;
 }
 
@@ -225,17 +246,15 @@ export async function updateTag(
   id: string,
   fields: { name?: string; color?: string; category?: string }
 ): Promise<void> {
-  await updateDoc(doc(db, "tags", id), fields);
+  const uid = requireUid();
+  await updateDoc(doc(getUserTagsCollection(db, uid), id), fields);
 }
 
 export async function deleteTag(id: string): Promise<void> {
   const uid = requireUid();
+  const recipesCol = getUserRecipesCollection(db, uid);
   const recipesWithTag = await getDocs(
-    query(
-      recipesCol,
-      where("ownerId", "==", uid),
-      where("tags", "array-contains", id)
-    )
+    query(recipesCol, where("tags", "array-contains", id))
   );
 
   if (!recipesWithTag.empty) {
@@ -246,10 +265,10 @@ export async function deleteTag(id: string): Promise<void> {
         tags: currentTags.filter((t) => t !== id),
       });
     }
-    batch.delete(doc(db, "tags", id));
+    batch.delete(doc(getUserTagsCollection(db, uid), id));
     await batch.commit();
   } else {
-    await deleteDoc(doc(db, "tags", id));
+    await deleteDoc(doc(getUserTagsCollection(db, uid), id));
   }
 }
 
@@ -257,7 +276,7 @@ export async function deleteTag(id: string): Promise<void> {
 
 export async function fetchCategories(): Promise<Category[]> {
   const uid = requireUid();
-  const q = query(categoriesCol, where("ownerId", "==", uid), orderBy("name"));
+  const q = query(getUserCategoriesCollection(db, uid), orderBy("name"));
   const snap = await getDocs(q);
   return snap.docs.map((d) => docToCategory(d.id, d.data()));
 }
@@ -268,11 +287,10 @@ export async function createCategory(
   description: string = ""
 ): Promise<string> {
   const uid = requireUid();
-  const docRef = await addDoc(categoriesCol, {
+  const docRef = await addDoc(getUserCategoriesCollection(db, uid), {
     name,
     icon,
     description,
-    ownerId: uid,
   });
   return docRef.id;
 }
@@ -281,17 +299,15 @@ export async function updateCategory(
   id: string,
   data: Partial<Omit<Category, "id">>
 ): Promise<void> {
-  await updateDoc(doc(db, "categories", id), data);
+  const uid = requireUid();
+  await updateDoc(doc(getUserCategoriesCollection(db, uid), id), data);
 }
 
 export async function deleteCategory(id: string): Promise<void> {
   const uid = requireUid();
+  const recipesCol = getUserRecipesCollection(db, uid);
   const recipesWithCategory = await getDocs(
-    query(
-      recipesCol,
-      where("ownerId", "==", uid),
-      where("categoryId", "==", id)
-    )
+    query(recipesCol, where("categoryId", "==", id))
   );
 
   if (!recipesWithCategory.empty) {
@@ -299,29 +315,32 @@ export async function deleteCategory(id: string): Promise<void> {
     for (const snap of recipesWithCategory.docs) {
       batch.update(snap.ref, { categoryId: null });
     }
-    batch.delete(doc(db, "categories", id));
+    batch.delete(doc(getUserCategoriesCollection(db, uid), id));
     await batch.commit();
   } else {
-    await deleteDoc(doc(db, "categories", id));
+    await deleteDoc(doc(getUserCategoriesCollection(db, uid), id));
   }
 }
 
 /**
  * One-time per account: copies default tags and categories when the vault has none
- * (or only one side missing). Writes `userProfiles/{uid}.vaultDefaultsApplied`.
+ * (or only one side missing). Writes `users/{uid}` with `vaultDefaultsApplied`.
  * @returns true if new documents were created (caller may invalidate tag/category queries).
  */
 export async function ensureUserVaultDefaults(): Promise<boolean> {
   const uid = requireUid();
-  const profileRef = doc(userProfilesCol, uid);
+  const profileRef = getUserDocRef(db, uid);
   const profileSnap = await getDoc(profileRef);
   if (profileSnap.exists() && profileSnap.data()?.vaultDefaultsApplied === true) {
     return false;
   }
 
+  const tagsCol = getUserTagsCollection(db, uid);
+  const categoriesCol = getUserCategoriesCollection(db, uid);
+
   const [tagProbe, catProbe] = await Promise.all([
-    getDocs(query(tagsCol, where("ownerId", "==", uid), limit(1))),
-    getDocs(query(categoriesCol, where("ownerId", "==", uid), limit(1))),
+    getDocs(query(tagsCol, limit(1))),
+    getDocs(query(categoriesCol, limit(1))),
   ]);
   const hasTags = !tagProbe.empty;
   const hasCats = !catProbe.empty;
@@ -346,7 +365,6 @@ export async function ensureUserVaultDefaults(): Promise<boolean> {
           name: t.name,
           color: t.color,
           category: t.category,
-          ownerId: uid,
         });
       }
     }
@@ -357,7 +375,6 @@ export async function ensureUserVaultDefaults(): Promise<boolean> {
           name: c.name,
           description: c.description,
           icon: c.icon,
-          ownerId: uid,
         });
       }
     }
@@ -376,7 +393,7 @@ export async function ensureUserVaultDefaults(): Promise<boolean> {
 
 export async function fetchPantryItems(): Promise<PantryItem[]> {
   const uid = requireUid();
-  const q = query(pantryCol, where("ownerId", "==", uid), orderBy("name"));
+  const q = query(getUserPantryCollection(db, uid), orderBy("name"));
   const snap = await getDocs(q);
   const items = snap.docs.map((d) => docToPantryItem(d.id, d.data()));
   return items.sort((a, b) =>
@@ -388,9 +405,8 @@ export async function addPantryItem(
   item: Omit<PantryItem, "id" | "addedAt">
 ): Promise<string> {
   const uid = requireUid();
-  const docRef = await addDoc(pantryCol, {
+  const docRef = await addDoc(getUserPantryCollection(db, uid), {
     ...item,
-    ownerId: uid,
     addedAt: Timestamp.now(),
   });
   return docRef.id;
@@ -400,14 +416,17 @@ export async function updatePantryItem(
   id: string,
   data: Partial<PantryItem>
 ): Promise<void> {
+  const uid = requireUid();
   const { id: _, ...rest } = data;
-  await updateDoc(doc(db, "pantry", id), rest);
+  await updateDoc(doc(getUserPantryCollection(db, uid), id), rest);
 }
 
 export async function deletePantryItem(id: string): Promise<void> {
-  const snap = await getDoc(doc(db, "pantry", id));
+  const uid = requireUid();
+  const pantryRef = getUserPantryCollection(db, uid);
+  const snap = await getDoc(doc(pantryRef, id));
   const imageUrl = snap.exists() ? snap.data().imageUrl : null;
-  await deleteDoc(doc(db, "pantry", id));
+  await deleteDoc(doc(pantryRef, id));
   if (imageUrl) {
     const { deletePantryImage } = await import("./storage");
     await deletePantryImage(imageUrl);
@@ -419,57 +438,68 @@ export async function deletePantryItem(id: string): Promise<void> {
 export async function fetchMasterIngredients(): Promise<MasterIngredient[]> {
   const uid = requireUid();
   const [catSnap, userSnap] = await Promise.all([
-    getDocs(query(ingredientsCol, where("catalog", "==", true), orderBy("name"))),
-    getDocs(query(ingredientsCol, where("ownerId", "==", uid), orderBy("name"))),
+    getDocs(query(getIngredientCatalogCollection(db), orderBy("name"))),
+    getDocs(
+      query(getUserCustomIngredientsCollection(db, uid), orderBy("name"))
+    ),
   ]);
-  const merged = new Map<string, MasterIngredient>();
-  for (const d of catSnap.docs) {
-    merged.set(d.id, docToMasterIngredient(d.id, d.data()));
-  }
-  for (const d of userSnap.docs) {
-    merged.set(d.id, docToMasterIngredient(d.id, d.data()));
-  }
-  return [...merged.values()].sort((a, b) => a.name.localeCompare(b.name));
+  const merged: MasterIngredient[] = [
+    ...catSnap.docs.map((d) => docToCatalogIngredient(d.id, d.data())),
+    ...userSnap.docs.map((d) => docToCustomIngredient(d.id, d.data())),
+  ];
+  return merged.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export async function addMasterIngredient(
   item: Omit<MasterIngredient, "id" | "isCatalog">
 ): Promise<string> {
   const uid = requireUid();
-  const docRef = await addDoc(ingredientsCol, {
+  const docRef = await addDoc(getUserCustomIngredientsCollection(db, uid), {
     name: item.name,
     nameGr: item.nameGr,
     aliases: item.aliases,
     category: item.category,
-    ownerId: uid,
-    catalog: false,
   });
   return docRef.id;
 }
 
-/** Shared catalog row; requires `catalogAdmin` custom claim (Firestore rules). */
+/**
+ * Shared catalog row; requires `catalogAdmin` custom claim (Firestore rules).
+ * TODO: Add server/admin moderation flow if non-client catalog edits are required.
+ */
 export async function addCatalogMasterIngredient(
   item: Omit<MasterIngredient, "id" | "isCatalog">
 ): Promise<string> {
   requireUid();
   await refreshAuthIdToken();
-  const docRef = await addDoc(ingredientsCol, {
+  const docRef = await addDoc(getIngredientCatalogCollection(db), {
     name: item.name,
     nameGr: item.nameGr,
     aliases: item.aliases,
     category: item.category,
-    catalog: true,
   });
   return docRef.id;
 }
 
 export async function updateMasterIngredient(
   id: string,
-  data: Partial<Omit<MasterIngredient, "id" | "isCatalog">>
+  data: Partial<Omit<MasterIngredient, "id" | "isCatalog">>,
+  isCatalog: boolean
 ): Promise<void> {
-  await updateDoc(doc(db, "ingredients", id), data);
+  const uid = requireUid();
+  const ref = isCatalog
+    ? doc(getIngredientCatalogCollection(db), id)
+    : doc(getUserCustomIngredientsCollection(db, uid), id);
+  await updateDoc(ref, data);
 }
 
-export async function deleteMasterIngredient(id: string): Promise<void> {
-  await deleteDoc(doc(db, "ingredients", id));
+export async function deleteMasterIngredient(
+  id: string,
+  isCatalog: boolean
+): Promise<void> {
+  const uid = requireUid();
+  const ref = isCatalog
+    ? doc(getIngredientCatalogCollection(db), id)
+    : doc(getUserCustomIngredientsCollection(db, uid), id);
+  await deleteDoc(ref);
 }

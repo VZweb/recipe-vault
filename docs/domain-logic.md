@@ -5,7 +5,7 @@ Pure and Firebase-adjacent logic that defines product behavior beyond CRUD. Prim
 ## Client-side search (`search.ts`)
 
 - `buildSearchIndex` takes recipes, tags, categories, and master ingredients and returns a **Fuse.js** instance.
-- Each recipe is augmented into a `SearchableRecipe`: resolved tag names, category name, and a flattened `ingredientNames` string (primary and secondary names, Greek name and aliases from linked master ingredients; section headers excluded).
+- Each recipe is augmented into a `SearchableRecipe`: resolved tag names, category name, and a flattened `ingredientNames` string (primary and secondary names, Greek name and aliases from linked master ingredients via `resolveMasterIngredient` using `masterIngredientScope`; section headers excluded).
 - Fuse keys and weights: `title` (3), `ingredientNames` (2), `tagNames` (2), `categoryName` (2), `description` (1). Options include `threshold: 0.35`, `ignoreLocation: true`, `minMatchCharLength: 2`.
 
 If search behavior or fields change, update this doc and any UX copy that refers to “what is searchable.”
@@ -14,8 +14,8 @@ If search behavior or fields change, update this doc and any UX copy that refers
 
 `suggestRecipes(recipes, pantryItems)`:
 
-- Builds a `Set` of pantry `masterIngredientId` values (non-empty strings).
-- For each recipe, walks non-section ingredients: if `masterIngredientId` is in the set, counts as matched; otherwise missing.
+- Builds a `Set` of stable link keys from pantry rows (`ingredientLinkKey` from `masterIngredientId` + `masterIngredientScope`; legacy null scope uses a dedicated bucket so old data still matches).
+- For each recipe, walks non-section ingredients: if the line’s link key is in the set, counts as matched; otherwise missing.
 - Computes `matchPercentage` from matched vs total non-section ingredients.
 - Returns only recipes with at least one match, sorted by descending match percentage.
 

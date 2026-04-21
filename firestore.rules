@@ -12,74 +12,34 @@ service cloud.firestore {
       return signedIn() && request.auth.token.catalogAdmin == true;
     }
 
-    match /recipes/{recipeId} {
-      allow read: if signedIn() && resource.data.ownerId == request.auth.uid;
-      allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid;
-      allow update, delete: if signedIn() && resource.data.ownerId == request.auth.uid;
-    }
-
-    match /userProfiles/{userId} {
+    match /users/{userId} {
       allow read, create, update, delete: if signedIn() && request.auth.uid == userId;
     }
 
-    match /tags/{tagId} {
-      allow read: if signedIn() && resource.data.ownerId == request.auth.uid;
-      allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid;
-      allow update, delete: if signedIn() && resource.data.ownerId == request.auth.uid;
+    match /users/{userId}/recipes/{recipeId} {
+      allow read, create, update, delete: if signedIn() && request.auth.uid == userId;
     }
 
-    match /categories/{categoryId} {
-      allow read: if signedIn() && resource.data.ownerId == request.auth.uid;
-      allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid;
-      allow update, delete: if signedIn() && resource.data.ownerId == request.auth.uid;
+    match /users/{userId}/pantry/{pantryId} {
+      allow read, create, update, delete: if signedIn() && request.auth.uid == userId;
     }
 
-    match /pantry/{pantryId} {
-      allow read: if signedIn() && resource.data.ownerId == request.auth.uid;
-      allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid;
-      allow update, delete: if signedIn() && resource.data.ownerId == request.auth.uid;
+    match /users/{userId}/tags/{tagId} {
+      allow read, create, update, delete: if signedIn() && request.auth.uid == userId;
     }
 
-    match /ingredients/{ingredientId} {
-      allow read: if signedIn() && (
-        resource.data.get("catalog", false) == true ||
-        resource.data.get("ownerId", "") == request.auth.uid
-      );
-      allow create: if signedIn() && (
-        (
-          request.resource.data.ownerId == request.auth.uid
-          && request.resource.data.get("catalog", false) == false
-        )
-        || (
-          isCatalogAdmin()
-          && request.resource.data.get("catalog", false) == true
-          && (
-            !request.resource.data.keys().hasAny(["ownerId"])
-            || request.resource.data.ownerId == request.auth.uid
-          )
-        )
-      );
-      allow update: if signedIn() && (
-        (
-          resource.data.get("ownerId", "") == request.auth.uid
-          && resource.data.get("catalog", false) == false
-        )
-        || (
-          isCatalogAdmin()
-          && resource.data.get("catalog", false) == true
-          && request.resource.data.get("catalog", false) == true
-        )
-      );
-      allow delete: if signedIn() && (
-        (
-          resource.data.get("ownerId", "") == request.auth.uid
-          && resource.data.get("catalog", false) == false
-        )
-        || (
-          isCatalogAdmin()
-          && resource.data.get("catalog", false) == true
-        )
-      );
+    match /users/{userId}/categories/{categoryId} {
+      allow read, create, update, delete: if signedIn() && request.auth.uid == userId;
+    }
+
+    match /users/{userId}/customIngredients/{ingredientId} {
+      allow read, create, update, delete: if signedIn() && request.auth.uid == userId;
+    }
+
+    // TODO: tighten if you add moderation tools — for now only catalogAdmin may write.
+    match /ingredientCatalog/{ingredientId} {
+      allow read: if signedIn();
+      allow create, update, delete: if signedIn() && isCatalogAdmin();
     }
   }
 }

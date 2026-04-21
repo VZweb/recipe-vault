@@ -15,45 +15,46 @@ The web client uses the Firebase JS SDK. There is no custom REST API: reads and 
 
 Enable **Email/Password** and **Google** sign-in providers in the Firebase console, and add your hosting and localhost domains under **Authorized domains**.
 
-## Firestore collections
+## Firestore layout
 
-Collection names and mapping logic live in `src/lib/firestore.ts`.
+Path helpers live in `src/lib/firestorePaths.ts`; reads/writes are implemented in `src/lib/firestore.ts`.
 
-| Collection | Purpose | Ordering / queries used |
-|------------|---------|-------------------------|
-| `recipes` | Recipe documents | `where("ownerId","==",uid)` plus `orderBy("createdAt","desc")` or filters on `tags` / `categoryId` (composite indexes required). |
-| `tags` | Tag metadata | `where("ownerId","==",uid)`, `orderBy("name")` |
-| `categories` | Recipe categories | `where("ownerId","==",uid)`, `orderBy("name")` |
-| `pantry` | Pantry items | `where("ownerId","==",uid)`, `orderBy("name")`, then client sort by category and name |
-| `ingredients` | Master ingredient catalog | Two queries merged in the client: `where("catalog","==",true)` and `where("ownerId","==",uid)`, each with `orderBy("name")` |
-| `userProfiles` | Per-user metadata | One document per uid (`userProfiles/{uid}`). Used to record `vaultDefaultsApplied` after starter tags/categories are copied for new accounts (`ensureUserVaultDefaults` in `firestore.ts`). |
+| Path | Purpose | Ordering / queries used |
+|------|---------|-------------------------|
+| `users/{uid}/recipes` | Recipe documents | `orderBy("createdAt","desc")`, or `where("tags","array-contains", …)` / `where("categoryId","==", …)` with client-side AND for extra tags |
+| `users/{uid}/tags` | Tag metadata | `orderBy("name")` |
+| `users/{uid}/categories` | Recipe categories | `orderBy("name")` |
+| `users/{uid}/pantry` | Pantry items | `orderBy("name")`, then client sort by category and name |
+| `ingredientCatalog` | Shared master ingredients | `orderBy("name")` |
+| `users/{uid}/customIngredients` | User-created master ingredients | `orderBy("name")` |
+| `users/{uid}` | User profile / flags | Document used for `vaultDefaultsApplied` etc. |
 
 ### Recipe documents
 
-Recipes store **`ownerId`**, arrays of ingredient lines and step strings, optional `categoryId`, `tags` (array of tag document IDs), `imageUrls`, timestamps (`createdAt`, `updatedAt`), and `cookedCount`. `docToRecipe` normalizes missing fields when reading. The recipe list’s **multi-tag filter** is **AND** (recipes must include every selected tag): `fetchRecipes` uses `array-contains` on the first id to query, then filters the rest in memory.
+Recipes store arrays of ingredient lines (with optional `masterIngredientId` + `masterIngredientScope`: `catalog` | `custom` | null for legacy), steps, optional `categoryId`, `tags` (array of tag document IDs), `imageUrls`, timestamps (`createdAt`, `updatedAt`), and `cookedCount`. `docToRecipe` normalizes missing fields when reading. The recipe list’s **multi-tag filter** is **AND**: `fetchRecipes` uses `array-contains` on the first tag id, then filters the rest in memory.
 
 Deleting a recipe removes linked Storage objects best-effort (`deleteRecipe` + `deleteRecipeImage`).
 
 ### Tags and categories
 
-- **Delete tag**: batches removal of that tag id from every **owned** recipe’s `tags` array, then deletes the tag document.
-- **Delete category**: sets `categoryId` to `null` on affected **owned** recipes, then deletes the category.
+- **Delete tag**: batches removal of that tag id from every recipe’s `tags` array under the same user, then deletes the tag document.
+- **Delete category**: sets `categoryId` to `null` on affected recipes, then deletes the category.
 
 ### Pantry
 
-Pantry items store **`ownerId`** and reference `masterIngredientId` (string). Deleting a pantry item removes its `imageUrl` file from Storage when present (dynamic import of `deletePantryImage`).
+Pantry items reference `masterIngredientId` and `masterIngredientScope` when linked to the shared catalog or custom ingredients. Deleting a pantry item removes its `imageUrl` file from Storage when present (dynamic import of `deletePantryImage`).
 
 ### Master ingredients
 
-Stored in the `ingredients` collection. **Catalog** rows (`catalog: true`) are shared defaults for every user; only accounts with the **`catalogAdmin`** Auth custom claim may create, update, or delete them from the client (see `scripts/set-catalog-admin-claim.mjs` and `firestore.rules`). **User** rows (`ownerId` set, `catalog: false`) are editable by that owner. `docToMasterIngredient` sets `isCatalog` for the UI.
+**Catalog** documents live in `ingredientCatalog` (no per-user copy). **Custom** documents live in `users/{uid}/customIngredients`. The client merges both lists for autocomplete; `MasterIngredient.isCatalog` distinguishes them for writes.
 
 ### Default tags and categories for new accounts
 
-Starter lists live in [`src/data/defaultVaultTemplates.ts`](../src/data/defaultVaultTemplates.ts). Regenerate them from a reference account with `node scripts/export-user-vault-templates.mjs --uid=... --write` (service account required). On sign-in, `ensureUserVaultDefaults()` runs once per account (see `userProfiles`): if the user has **no** tags and/or **no** categories, it copies the templates into `tags` / `categories` with that user’s `ownerId`. Existing users who already have both tags and categories only get `userProfiles` marked so the seed does not run again.
+Starter lists live in [`src/data/defaultVaultTemplates.ts`](../src/data/defaultVaultTemplates.ts). Regenerate them from a reference account with `node scripts/export-user-vault-templates.mjs --uid=... --write` (service account required). On sign-in, `ensureUserVaultDefaults()` runs once per account: if the user has **no** tags and/or **no** categories, it copies the templates into `users/{uid}/tags` and `users/{uid}/categories`. It records `vaultDefaultsApplied` on `users/{uid}`.
 
 ## TypeScript types
 
-Canonical shapes are in `src/types/` (`recipe.ts`, `tag.ts`, `category.ts`, `pantry.ts`, `ingredient.ts`). When you change Firestore fields, update both the mapper in `firestore.ts` and the corresponding types.
+Canonical shapes are in `src/types/` (`recipe.ts`, `tag.ts`, `category.ts`, `pantry.ts`, `ingredient.ts`, `ingredientRef.ts`). When you change Firestore fields, update both the mapper in `firestore.ts` and the corresponding types.
 
 ## Firebase Storage paths
 
@@ -66,10 +67,10 @@ Download URLs are stored on documents (`imageUrls` on recipes, `imageUrl` on pan
 
 ## Indexes
 
-Composite indexes for `ownerId` (and `catalog`) combinations live in [`firestore.indexes.json`](../firestore.indexes.json). Deploy with `firebase deploy --only firestore:indexes` (or full `firebase deploy`) after the console prompts you if a query fails in development.
+[`firestore.indexes.json`](../firestore.indexes.json) may be empty if all queries use only automatic single-field indexes. If the console or CLI reports a missing composite index after a query change, add it there and deploy with `firebase deploy --only firestore:indexes`.
 
 ## Data migrations
 
-- **Catalog flag:** from the repository root, `node scripts/backfill-ingredients-catalog.mjs` — sets `catalog: true` on ingredient docs that are not user-owned.
-- **Existing vault data:** `node scripts/backfill-vault-owner.mjs --owner-uid=YOUR_UID` — assigns `ownerId` on legacy `recipes`, `tags`, `categories`, and `pantry` documents missing it so they appear for that account after rules tighten.
-- **Recipe import:** `scripts/import-recipes.mjs` requires `--owner-uid=` for real writes so imported recipes and new tags are owned by that user.
+- **Move legacy top-level collections into `users/{uid}` and split ingredients:** `node scripts/migrate-to-user-scoped-firestore.mjs [--dry-run]` (service account). Run in a dev project first; then deploy this app version and updated `firestore.rules`.
+- **Legacy helpers (old top-level `ingredients` / `ownerId` model):** `scripts/backfill-ingredients-catalog.mjs`, `scripts/backfill-vault-owner.mjs` — kept for reference only after migration.
+- **Recipe import:** `scripts/import-recipes.mjs` requires `--owner-uid=` for writes; it targets `users/{uid}/recipes` and `users/{uid}/tags`.

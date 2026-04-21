@@ -35,6 +35,8 @@ import { IngredientAutocomplete } from "@/components/ui/IngredientAutocomplete";
 import { IngredientQuickAdd } from "@/components/ui/IngredientQuickAdd";
 import type { PantryItem, PantryCategory } from "@/types/pantry";
 import { PANTRY_CATEGORIES, PANTRY_UNITS } from "@/types/pantry";
+import type { MasterIngredientScope } from "@/types/ingredientRef";
+import { ingredientLinkKey, masterScopeFromMasterIngredient } from "@/lib/ingredientRef";
 
 interface EditState {
   name: string;
@@ -42,6 +44,7 @@ interface EditState {
   quantity: string;
   unit: string;
   masterIngredientId: string | null;
+  masterIngredientScope: MasterIngredientScope;
   note: string;
   imageFile: File | null;
   imagePreview: string | null;
@@ -67,6 +70,8 @@ export function PantryPage() {
   const [newMasterIngredientId, setNewMasterIngredientId] = useState<
     string | null
   >(null);
+  const [newMasterIngredientScope, setNewMasterIngredientScope] =
+    useState<MasterIngredientScope>(null);
   const [newNote, setNewNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -121,9 +126,16 @@ export function PantryPage() {
     setNewImagePreview(URL.createObjectURL(file));
   };
 
-  const findDuplicate = (name: string, masterId: string | null): PantryItem | undefined => {
+  const findDuplicate = (
+    name: string,
+    masterId: string | null,
+    masterScope: MasterIngredientScope = null
+  ): PantryItem | undefined => {
     if (masterId) {
-      return items.find((i) => i.masterIngredientId === masterId);
+      const want = ingredientLinkKey(masterId, masterScope);
+      return items.find(
+        (i) => ingredientLinkKey(i.masterIngredientId, i.masterIngredientScope) === want
+      );
     }
     const norm = normalizeText(name);
     return items.find((i) => normalizeText(i.name) === norm);
@@ -146,6 +158,7 @@ export function PantryPage() {
         isStaple: newIsStaple,
         imageUrl: null,
         masterIngredientId: newMasterIngredientId!,
+        masterIngredientScope: newMasterIngredientScope,
         note: newNote.trim(),
       });
 
@@ -171,6 +184,7 @@ export function PantryPage() {
           isStaple: newIsStaple,
           imageUrl,
           masterIngredientId: newMasterIngredientId!,
+          masterIngredientScope: newMasterIngredientScope,
           note: newNote.trim(),
           addedAt: new Date(),
         },
@@ -182,6 +196,7 @@ export function PantryPage() {
       setNewUnit("");
       setNewIsStaple(false);
       setNewMasterIngredientId(null);
+      setNewMasterIngredientScope(null);
       setNewNote("");
       clearImageSelection();
     } finally {
@@ -193,7 +208,11 @@ export function PantryPage() {
     e.preventDefault();
     if (!newName.trim()) return;
 
-    const existing = findDuplicate(newName.trim(), newMasterIngredientId);
+    const existing = findDuplicate(
+      newName.trim(),
+      newMasterIngredientId,
+      newMasterIngredientScope
+    );
     if (existing) {
       setDuplicateMatch(existing);
       return;
@@ -249,6 +268,7 @@ export function PantryPage() {
       quantity: item.quantity?.toString() ?? "",
       unit: item.unit ?? "",
       masterIngredientId: item.masterIngredientId,
+      masterIngredientScope: item.masterIngredientScope,
       note: item.note ?? "",
       imageFile: null,
       imagePreview: null,
@@ -309,8 +329,13 @@ export function PantryPage() {
       }
       if (qty !== item.quantity) updates.quantity = qty;
       if (unit !== item.unit) updates.unit = unit;
-      if (editState.masterIngredientId && editState.masterIngredientId !== item.masterIngredientId) {
+      if (
+        editState.masterIngredientId &&
+        (editState.masterIngredientId !== item.masterIngredientId ||
+          editState.masterIngredientScope !== item.masterIngredientScope)
+      ) {
         updates.masterIngredientId = editState.masterIngredientId;
+        updates.masterIngredientScope = editState.masterIngredientScope;
       }
       const trimmedNote = editState.note.trim();
       if (trimmedNote !== (item.note ?? "")) {
@@ -353,6 +378,9 @@ export function PantryPage() {
                 unit,
                 imageUrl: newImageUrl,
                 masterIngredientId: editState.masterIngredientId ?? item.masterIngredientId,
+                masterIngredientScope: editState.masterIngredientId
+                  ? editState.masterIngredientScope
+                  : null,
                 note: trimmedNote,
               }
             : i
@@ -385,7 +413,8 @@ export function PantryPage() {
     const map = new Map<string, string[]>();
     for (const mi of masterIngredients) {
       if (mi.aliases.length > 0) {
-        map.set(mi.id, mi.aliases.map(normalizeText));
+        const k = ingredientLinkKey(mi.id, masterScopeFromMasterIngredient(mi));
+        if (k) map.set(k, mi.aliases.map(normalizeText));
       }
     }
     return map;
@@ -399,7 +428,11 @@ export function PantryPage() {
         normalizeText(item.name),
         normalizeText(item.nameSecondary ?? ""),
         normalizeText(item.note ?? ""),
-        ...(item.masterIngredientId ? aliasMap.get(item.masterIngredientId) ?? [] : []),
+        ...(ingredientLinkKey(item.masterIngredientId, item.masterIngredientScope)
+          ? aliasMap.get(
+              ingredientLinkKey(item.masterIngredientId, item.masterIngredientScope)!
+            ) ?? []
+          : []),
       ].filter(Boolean);
       return targets.some((t) => t.includes(q));
     });
@@ -491,12 +524,14 @@ export function PantryPage() {
                     onChange={(v) => {
                       setNewName(v);
                       setNewMasterIngredientId(null);
+                      setNewMasterIngredientScope(null);
                       setQuickAddName(null);
                     }}
                     onSelect={(mi) => {
                       setNewName(mi.name);
                       setNewNameSecondary(mi.nameGr);
                       setNewMasterIngredientId(mi.id);
+                      setNewMasterIngredientScope(masterScopeFromMasterIngredient(mi));
                       setQuickAddName(null);
                       if (mi.category) {
                         const pantryMatch = PANTRY_CATEGORIES.find(
@@ -535,11 +570,12 @@ export function PantryPage() {
                   const qty = newQuantity ? Number(newQuantity) : null;
                   const unit = newUnit || null;
 
-                  const existing = findDuplicate(mi.name, mi.id);
+                  const existing = findDuplicate(mi.name, mi.id, "catalog");
                   if (existing) {
                     setNewName(mi.name);
                     setNewNameSecondary(mi.nameGr);
                     setNewMasterIngredientId(mi.id);
+                    setNewMasterIngredientScope("catalog");
                     setNewCategory(pantryCategory);
                     setDuplicateMatch(existing);
                     return;
@@ -557,6 +593,7 @@ export function PantryPage() {
                       isStaple: newIsStaple,
                       imageUrl: null,
                       masterIngredientId: mi.id,
+                      masterIngredientScope: "catalog",
                       note: newNote.trim(),
                     });
 
@@ -573,6 +610,7 @@ export function PantryPage() {
                         isStaple: newIsStaple,
                         imageUrl: null,
                         masterIngredientId: mi.id,
+                        masterIngredientScope: "catalog" as const,
                         note: newNote.trim(),
                         addedAt: new Date(),
                       },
@@ -584,6 +622,7 @@ export function PantryPage() {
                     setNewUnit("");
                     setNewIsStaple(false);
                     setNewMasterIngredientId(null);
+                    setNewMasterIngredientScope(null);
                     setNewNote("");
                     clearImageSelection();
                   } finally {
@@ -763,6 +802,7 @@ export function PantryPage() {
                   setNewUnit("");
                   setNewIsStaple(false);
                   setNewMasterIngredientId(null);
+                  setNewMasterIngredientScope(null);
                   setNewNote("");
                   clearImageSelection();
                   setQuickAddName(null);
@@ -869,6 +909,7 @@ export function PantryPage() {
                                           ...s,
                                           name: v,
                                           masterIngredientId: null,
+                                          masterIngredientScope: null,
                                         }
                                       : s
                                   )
@@ -881,6 +922,7 @@ export function PantryPage() {
                                           name: mi.name,
                                           nameSecondary: mi.nameGr,
                                           masterIngredientId: mi.id,
+                                          masterIngredientScope: masterScopeFromMasterIngredient(mi),
                                         }
                                       : s
                                   )

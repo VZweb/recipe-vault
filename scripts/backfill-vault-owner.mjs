@@ -1,12 +1,11 @@
 #!/usr/bin/env node
 /**
- * Assigns `ownerId` to existing vault documents that are missing it, so they
- * become visible to that user after Firestore rules are tightened.
+ * LEGACY: assigns `ownerId` on top-level `recipes`, `tags`, `categories`, `pantry`.
+ * The current app stores vault data under `users/{uid}/...` instead; use
+ * `scripts/migrate-to-user-scoped-firestore.mjs` to move from the old layout.
  *
  * Usage:
  *   node scripts/backfill-vault-owner.mjs --owner-uid=FIREBASE_AUTH_UID [--dry-run]
- *
- * Touches collections: recipes, tags, categories, pantry.
  */
 
 import fs from "node:fs";

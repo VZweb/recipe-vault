@@ -3,6 +3,7 @@ import type { Recipe } from "@/types/recipe";
 import type { Tag } from "@/types/tag";
 import type { Category } from "@/types/category";
 import type { MasterIngredient } from "@/types/ingredient";
+import { resolveMasterIngredient } from "@/lib/ingredientRef";
 
 export interface SearchableRecipe extends Recipe {
   tagNames: string[];
@@ -18,7 +19,6 @@ export function buildSearchIndex(
 ) {
   const tagMap = new Map(tags.map((t) => [t.id, t.name]));
   const catMap = new Map(categories.map((c) => [c.id, c.name]));
-  const masterMap = new Map(masterIngredients.map((m) => [m.id, m]));
 
   const searchable: SearchableRecipe[] = recipes.map((r) => ({
     ...r,
@@ -31,9 +31,11 @@ export function buildSearchIndex(
       .flatMap((i) => {
         const names = [i.name];
         if (i.nameSecondary) names.push(i.nameSecondary);
-        const master = i.masterIngredientId
-          ? masterMap.get(i.masterIngredientId)
-          : undefined;
+        const master = resolveMasterIngredient(
+          i.masterIngredientId,
+          i.masterIngredientScope,
+          masterIngredients
+        );
         if (master) {
           if (master.nameGr && !names.includes(master.nameGr))
             names.push(master.nameGr);

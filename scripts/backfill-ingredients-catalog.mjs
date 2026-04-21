@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * Sets `catalog: true` on every ingredient document that is not user-owned
- * (no `ownerId` field). Required before strict Firestore rules so the shared
- * catalog remains readable.
+ * LEGACY (pre–user-scoped model): sets `catalog: true` on top-level `ingredients`
+ * documents without `ownerId`. New deployments use `ingredientCatalog` instead;
+ * run `scripts/migrate-to-user-scoped-firestore.mjs` once to move data.
  *
  * Usage:
  *   node scripts/backfill-ingredients-catalog.mjs [--dry-run]

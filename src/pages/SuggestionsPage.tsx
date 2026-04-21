@@ -13,11 +13,14 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { IngredientAutocomplete } from "@/components/ui/IngredientAutocomplete";
 import type { PantryItem } from "@/types/pantry";
 import { PANTRY_CATEGORIES } from "@/types/pantry";
+import type { MasterIngredientScope } from "@/types/ingredientRef";
+import { ingredientLinkKey, masterScopeFromMasterIngredient } from "@/lib/ingredientRef";
 
 interface ExtraIngredient {
   name: string;
   nameSecondary: string;
   masterIngredientId: string | null;
+  masterIngredientScope: MasterIngredientScope;
 }
 
 export function SuggestionsPage() {
@@ -32,6 +35,7 @@ export function SuggestionsPage() {
     name: "",
     nameSecondary: "",
     masterIngredientId: null,
+    masterIngredientScope: null,
   });
   const [copied, setCopied] = useState(false);
 
@@ -63,6 +67,7 @@ export function SuggestionsPage() {
         isStaple: false,
         imageUrl: null,
         masterIngredientId: e.masterIngredientId ?? "",
+        masterIngredientScope: e.masterIngredientScope,
         note: "",
         addedAt: new Date(),
       })),
@@ -77,10 +82,13 @@ export function SuggestionsPage() {
 
   const matchedExtrasPerRecipe = useMemo(() => {
     if (extraIngredients.length === 0) return new Map<string, string[]>();
-    const extraById = new Map(
+    const extraByLinkKey = new Map(
       extraIngredients
-        .filter((e) => e.masterIngredientId)
-        .map((e) => [e.masterIngredientId!, e.name])
+        .map((e) => {
+          const k = ingredientLinkKey(e.masterIngredientId, e.masterIngredientScope);
+          return k ? ([k, e.name] as const) : null;
+        })
+        .filter((x): x is NonNullable<typeof x> => x !== null)
     );
 
     const map = new Map<string, string[]>();
@@ -89,8 +97,9 @@ export function SuggestionsPage() {
       for (const ing of s.recipe.ingredients) {
         if (ing.isSection) continue;
         if (!s.matchedIngredients.includes(ing.name)) continue;
-        if (ing.masterIngredientId && extraById.has(ing.masterIngredientId)) {
-          const name = extraById.get(ing.masterIngredientId)!;
+        const lk = ingredientLinkKey(ing.masterIngredientId, ing.masterIngredientScope);
+        if (lk && extraByLinkKey.has(lk)) {
+          const name = extraByLinkKey.get(lk)!;
           if (!hits.includes(name)) hits.push(name);
         }
       }
@@ -130,8 +139,13 @@ export function SuggestionsPage() {
     });
   }, [suggestions, extraIngredients.length, matchedExtrasPerRecipe]);
 
-  const pantryMasterIds = useMemo(
-    () => new Set(pantryItems.map((p) => p.masterIngredientId).filter(Boolean)),
+  const pantryLinkKeys = useMemo(
+    () =>
+      new Set(
+        pantryItems
+          .map((p) => ingredientLinkKey(p.masterIngredientId, p.masterIngredientScope))
+          .filter((k): k is string => k !== null)
+      ),
     [pantryItems]
   );
 
@@ -149,10 +163,16 @@ export function SuggestionsPage() {
         name: pendingExtra.name,
         nameSecondary: pendingExtra.nameSecondary,
         masterIngredientId: pendingExtra.masterIngredientId,
+        masterIngredientScope: pendingExtra.masterIngredientScope,
       },
     ]);
     setExtraIngredient("");
-    setPendingExtra({ name: "", nameSecondary: "", masterIngredientId: null });
+    setPendingExtra({
+      name: "",
+      nameSecondary: "",
+      masterIngredientId: null,
+      masterIngredientScope: null,
+    });
   };
 
   const buildRecipePrompt = useCallback(() => {
@@ -255,11 +275,21 @@ export function SuggestionsPage() {
             className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
             onChange={(v) => {
               setExtraIngredient(v);
-              setPendingExtra({ name: v, nameSecondary: "", masterIngredientId: null });
+              setPendingExtra({
+                name: v,
+                nameSecondary: "",
+                masterIngredientId: null,
+                masterIngredientScope: null,
+              });
             }}
             onSelect={(mi) => {
               setExtraIngredient(mi.name);
-              setPendingExtra({ name: mi.name, nameSecondary: mi.nameGr, masterIngredientId: mi.id });
+              setPendingExtra({
+                name: mi.name,
+                nameSecondary: mi.nameGr,
+                masterIngredientId: mi.id,
+                masterIngredientScope: masterScopeFromMasterIngredient(mi),
+              });
             }}
           />
           <Button type="submit" variant="secondary" disabled={!pendingExtra.name.trim()}>
@@ -275,7 +305,11 @@ export function SuggestionsPage() {
             <span
               key={i}
               className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                (ing.masterIngredientId ? pantryMasterIds.has(ing.masterIngredientId) : pantryNames.has(ing.name.toLowerCase()))
+                (ing.masterIngredientId
+                  ? pantryLinkKeys.has(
+                      ingredientLinkKey(ing.masterIngredientId, ing.masterIngredientScope)!
+                    )
+                  : pantryNames.has(ing.name.toLowerCase()))
                   ? "bg-green-50 text-green-700"
                   : "bg-blue-950/10 text-blue-950"
               }`}

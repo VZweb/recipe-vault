@@ -154,7 +154,7 @@ function isGreek(s) {
 // ---------------------------------------------------------------------------
 
 async function loadExistingCatalog() {
-  const snap = await db.collection("ingredients").get();
+  const snap = await db.collection("ingredientCatalog").get();
   const entries = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
   const normalizedNames = new Set();
   for (const e of entries) {
@@ -276,7 +276,7 @@ if (dryRun) {
 }
 
 // Write to Firestore in batches of 500
-const ingredientsCol = db.collection("ingredients");
+const ingredientsCol = db.collection("ingredientCatalog");
 const BATCH_SIZE = 450;
 let created = 0;
 

@@ -1,3 +1,5 @@
+import type { MasterIngredientScope } from "./ingredientRef";
+
 export interface PantryItem {
   id: string;
   name: string;
@@ -9,6 +11,8 @@ export interface PantryItem {
   isStaple: boolean;
   imageUrl: string | null;
   masterIngredientId: string;
+  /** `catalog` / `custom` / null (legacy); empty masterIngredientId implies null scope */
+  masterIngredientScope: MasterIngredientScope;
   note: string;
   addedAt: Date;
 }

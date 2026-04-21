@@ -2,18 +2,15 @@
 
 ## Current posture
 
-The app uses **Firebase Authentication** (email/password and Google). Signed-in users access only their own **vault** data: `recipes`, `tags`, `categories`, and `pantry` documents include an **`ownerId`** field (Firebase Auth `uid`) that must match `request.auth.uid` in Firestore rules.
+The app uses **Firebase Authentication** (email/password and Google). Signed-in users read and write only under their own document tree: **`users/{uid}`** and subcollections **`recipes`**, **`pantry`**, **`tags`**, **`categories`**, and **`customIngredients`**. Authorization is path-based (`request.auth.uid == userId`); optional `ownerId` fields on migrated documents are not used for access control.
 
-The **`userProfiles`** collection stores one document per user (`userProfiles/{uid}`) for account metadata (e.g. default tags/categories seeding). Rules restrict read/write to `request.auth.uid == userId` (the document id must match the signed-in user).
+The **`users/{uid}`** document holds account metadata (for example `vaultDefaultsApplied` after starter tags/categories are seeded). Rules allow read/write only when `request.auth.uid == userId`.
 
-### Ingredients catalog
+### Ingredient catalog
 
-Documents in **`ingredients`** are either:
+Top-level **`ingredientCatalog`** holds shared master ingredients. Any signed-in user may **read** catalog documents. **Create, update, and delete** are allowed only for accounts with the Auth custom claim **`catalogAdmin: true`** (set with `node scripts/set-catalog-admin-claim.mjs --uid=YOUR_AUTH_UID` using the Admin SDK service account). The app treats catalog rows as read-only for everyone else; Firestore rules enforce the same.
 
-- **Shared catalog:** `catalog: true` (typically no `ownerId`) — readable by any signed-in user. **Create / update / delete** from the client is allowed only for accounts that have the Auth **custom claim** `catalogAdmin: true` (set with `node scripts/set-catalog-admin-claim.mjs --uid=YOUR_AUTH_UID` using the Admin SDK service account). Everyone else sees catalog rows as read-only in the app; Firestore rules enforce the same.
-- **User-owned:** `ownerId` equals the user’s `uid` and `catalog` is false — that user may create, update, or delete their own rows.
-
-From the repository root, run `node scripts/backfill-ingredients-catalog.mjs` once on existing data so legacy catalog rows get `catalog: true` before relying on these rules.
+User-created master ingredients live in **`users/{uid}/customIngredients`** and are readable/writable only by that user.
 
 After granting `catalogAdmin`, that user should **sign out and back in** (or otherwise refresh the ID token) so the claim appears in `getIdTokenResult()` and in rule evaluation.
 

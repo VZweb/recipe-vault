@@ -1,3 +1,5 @@
+import type { MasterIngredientScope } from "./ingredientRef";
+
 export interface Ingredient {
   name: string;
   nameSecondary: string;
@@ -5,6 +7,8 @@ export interface Ingredient {
   unit: string;
   sortOrder: number;
   masterIngredientId: string | null;
+  /** `catalog` = ingredientCatalog; `custom` = users/{uid}/customIngredients; null = legacy / unlinked */
+  masterIngredientScope: MasterIngredientScope;
   note: string;
   isSection: boolean;
 }

@@ -114,7 +114,7 @@ function cleanForMatching(name) {
 // ---------------------------------------------------------------------------
 
 async function loadCatalog() {
-  const snap = await db.collection("ingredients").orderBy("name").get();
+  const snap = await db.collection("ingredientCatalog").orderBy("name").get();
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
@@ -216,6 +216,7 @@ for (let i = 0; i < recipes.length; i++) {
 
     if (result) {
       ing.masterIngredientId = result.match.id;
+      ing.masterIngredientScope = "catalog";
       ing.nameSecondary = result.match.nameGr || "";
 
       // Extract qualifier text as note (e.g. "πράσα, χοντροκομμένα" → note: "χοντροκομμένα")
@@ -237,6 +238,7 @@ for (let i = 0; i < recipes.length; i++) {
       }
     } else {
       ing.masterIngredientId = null;
+      ing.masterIngredientScope = null;
       ing.nameSecondary = ing.nameSecondary || "";
       totalUnmatched++;
 

@@ -55,23 +55,26 @@ export function useIngredients() {
 
   const update = async (
     id: string,
-    data: Partial<Omit<MasterIngredient, "id" | "isCatalog">>
+    data: Partial<Omit<MasterIngredient, "id" | "isCatalog">>,
+    isCatalog: boolean
   ) => {
-    await updateMasterIngredient(id, data);
+    await updateMasterIngredient(id, data, isCatalog);
     queryClient.setQueryData<MasterIngredient[]>(
       queryKeys.masterIngredients(uid),
       (prev = []) =>
         prev
-          .map((i) => (i.id === id ? { ...i, ...data } : i))
+          .map((i) =>
+            i.id === id && i.isCatalog === isCatalog ? { ...i, ...data } : i
+          )
           .sort((a, b) => a.name.localeCompare(b.name))
     );
   };
 
-  const remove = async (id: string) => {
-    await deleteMasterIngredient(id);
+  const remove = async (id: string, isCatalog: boolean) => {
+    await deleteMasterIngredient(id, isCatalog);
     queryClient.setQueryData<MasterIngredient[]>(
       queryKeys.masterIngredients(uid),
-      (prev = []) => prev.filter((i) => i.id !== id)
+      (prev = []) => prev.filter((i) => !(i.id === id && i.isCatalog === isCatalog))
     );
   };
 

@@ -1,5 +1,6 @@
 import type { Recipe } from "@/types/recipe";
 import type { PantryItem } from "@/types/pantry";
+import { ingredientLinkKey } from "@/lib/ingredientRef";
 
 export interface SuggestionResult {
   recipe: Recipe;
@@ -14,8 +15,10 @@ export function suggestRecipes(
   recipes: Recipe[],
   pantryItems: PantryItem[]
 ): SuggestionResult[] {
-  const allMasterIds = new Set(
-    pantryItems.map((p) => p.masterIngredientId).filter((id) => id !== "")
+  const allLinkKeys = new Set(
+    pantryItems
+      .map((p) => ingredientLinkKey(p.masterIngredientId, p.masterIngredientScope))
+      .filter((k): k is string => k !== null)
   );
 
   const results: SuggestionResult[] = recipes.map((recipe) => {
@@ -24,7 +27,8 @@ export function suggestRecipes(
 
     for (const ing of recipe.ingredients) {
       if (ing.isSection) continue;
-      if (ing.masterIngredientId && allMasterIds.has(ing.masterIngredientId)) {
+      const k = ingredientLinkKey(ing.masterIngredientId, ing.masterIngredientScope);
+      if (k && allLinkKeys.has(k)) {
         matched.push(ing.name);
       } else {
         missing.push(ing.name);

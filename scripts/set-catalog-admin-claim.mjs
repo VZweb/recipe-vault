@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Sets or clears Firebase Auth custom claim `catalogAdmin` on a user.
- * That user may create/update/delete shared `ingredients` docs with `catalog: true`
+ * That user may create/update/delete shared `ingredientCatalog` documents
  * (see firestore.rules). Everyone else sees catalog rows read-only.
  *
  * Usage:

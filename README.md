@@ -49,7 +49,7 @@ cp .env.example .env
 npm run dev
 ```
 
-6. If you already have Firestore data from before multi-user rules, run the backfill scripts in [`docs/operations.md`](docs/operations.md) (ingredients `catalog` flag and optional `ownerId` on vault documents), then deploy `firestore.rules`, `storage.rules`, and `firestore.indexes.json` with the Firebase CLI.
+6. If you already have **legacy** top-level Firestore data (`recipes`, `ingredients`, `userProfiles`, etc.), run `scripts/migrate-to-user-scoped-firestore.mjs` (see [`docs/operations.md`](docs/operations.md)), then deploy `firestore.rules`, `storage.rules`, and `firestore.indexes.json` with the Firebase CLI.
 
 Sign in at `/login` to use the app; unauthenticated users are redirected there automatically.
 
