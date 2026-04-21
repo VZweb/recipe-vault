@@ -58,12 +58,12 @@ Pick one strategy and use it consistently for pantry.
 `useRecipes` in `src/hooks/useRecipes.ts` still runs `useEffect` + `fetchRecipes` on mount and whenever `tagFilter` / `categoryFilter` change. Phase 3 moves that to **`useQuery`** with a **key that includes filter arguments**, so:
 
 - Navigating **Home → Recipes → Home** within `staleTime` can reuse the **unfiltered** list cache.
-- Filtered lists (`array-contains-any` on tags, category id) get **separate cache entries** per distinct key.
+- Filtered lists (`array-contains` on tags plus client refinement, category id) get **separate cache entries** per distinct key.
 
 ### Firestore behavior to respect (see `fetchRecipes` in `src/lib/firestore.ts`)
 
 - Unfiltered: `orderBy("createdAt", "desc")`.
-- Tag filter: `where("tags", "array-contains-any", tagIds)` — Firestore allows **at most 10** tag ids; the hook/query layer should not invent keys with more than 10 without a documented strategy.
+- Tag filter: `where("tags", "array-contains", tagIds[0])`, then **client-side** `tagIds.every(…)` so multiple tags mean **AND** (all selected). Firestore cannot combine multiple `array-contains` on the same field in one query.
 - Category filter: `where("categoryId", "==", categoryId)`.
 - Combined tag + category: query may be tag-based first, then client filter by category (existing behavior); cache key must reflect the combination you actually fetch.
 

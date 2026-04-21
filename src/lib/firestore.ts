@@ -122,11 +122,13 @@ export async function fetchRecipes(
   const uid = requireUid();
   let q;
 
-  if (tagIds && tagIds.length > 0 && tagIds.length <= 10) {
+  if (tagIds && tagIds.length > 0) {
+    // Firestore cannot AND multiple `array-contains` on `tags`. Use one tag to narrow
+    // the query, then require every selected tag on the client (AND semantics).
     q = query(
       recipesCol,
       where("ownerId", "==", uid),
-      where("tags", "array-contains-any", tagIds)
+      where("tags", "array-contains", tagIds[0])
     );
   } else if (categoryId) {
     q = query(
@@ -140,6 +142,12 @@ export async function fetchRecipes(
 
   const snap = await getDocs(q);
   let recipes = snap.docs.map((d) => docToRecipe(d.id, d.data()));
+
+  if (tagIds && tagIds.length > 1) {
+    recipes = recipes.filter((r) =>
+      tagIds.every((id) => r.tags.includes(id))
+    );
+  }
 
   if (categoryId && tagIds && tagIds.length > 0) {
     recipes = recipes.filter((r) => r.categoryId === categoryId);

@@ -30,7 +30,7 @@ Collection names and mapping logic live in `src/lib/firestore.ts`.
 
 ### Recipe documents
 
-Recipes store **`ownerId`**, arrays of ingredient lines and step strings, optional `categoryId`, `tags` (array of tag document IDs), `imageUrls`, timestamps (`createdAt`, `updatedAt`), and `cookedCount`. `docToRecipe` normalizes missing fields when reading.
+Recipes store **`ownerId`**, arrays of ingredient lines and step strings, optional `categoryId`, `tags` (array of tag document IDs), `imageUrls`, timestamps (`createdAt`, `updatedAt`), and `cookedCount`. `docToRecipe` normalizes missing fields when reading. The recipe list’s **multi-tag filter** is **AND** (recipes must include every selected tag): `fetchRecipes` uses `array-contains` on the first id to query, then filters the rest in memory.
 
 Deleting a recipe removes linked Storage objects best-effort (`deleteRecipe` + `deleteRecipeImage`).
 
