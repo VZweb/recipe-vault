@@ -35,6 +35,7 @@ These scripts expect a service account JSON at `scripts/service-account.json` or
 | `node scripts/backfill-vault-owner.mjs --owner-uid=FIREBASE_UID` | **Legacy only:** set `ownerId` on old top-level vault docs. |
 | `node scripts/export-user-vault-templates.mjs --uid=FIREBASE_UID [--write]` | Dump that user’s `users/{uid}/tags` and `users/{uid}/categories` as TypeScript for `src/data/defaultVaultTemplates.ts` (`--write` overwrites the file; omits tag names containing U+FFFD from bad imports). |
 | `node scripts/seed-categories-tags.mjs --owner-uid=FIREBASE_UID [--dry-run]` | Seed curated tags/categories under `users/{uid}/…`. |
+| `node scripts/copy-recipes-to-user.mjs --from-uid=… --to-uid=… --ids=id1,id2` | Copy specific `users/{from}/recipes/{id}` docs to `users/{to}/recipes/…` (see `--help`; optional `--strip-refs`, `--new-ids`, `--overwrite`). |
 
 **Deploy order (typical):** run `migrate-to-user-scoped-firestore.mjs` (or start on a fresh project), deploy `firestore.indexes.json` if you added composites, deploy `firestore.rules`, then deploy the web app. Enable **Authentication** providers in the Firebase console first.
 
