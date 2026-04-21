@@ -651,34 +651,47 @@ export function RecipeEditorPage() {
         <div className="space-y-2">
           {form.ingredients.map((ing, idx) =>
             ing.isSection ? (
-              <div key={idx} className="flex items-center gap-2 pt-2">
-                <div className="flex flex-col flex-shrink-0">
-                  <button type="button" onClick={() => moveIngredient(idx, -1)} disabled={idx === 0} className="p-0.5 text-stone-400 hover:text-stone-600 disabled:opacity-25 disabled:cursor-default transition-colors"><ChevronUp size={14} /></button>
-                  <button type="button" onClick={() => moveIngredient(idx, 1)} disabled={idx === form.ingredients.length - 1} className="p-0.5 text-stone-400 hover:text-stone-600 disabled:opacity-25 disabled:cursor-default transition-colors"><ChevronDown size={14} /></button>
+              <div
+                key={idx}
+                className="flex flex-col gap-2 rounded-xl border border-stone-200 bg-stone-50/60 p-3 pt-3 sm:flex-row sm:items-center sm:gap-2 sm:border-0 sm:bg-transparent sm:p-0 sm:pt-2"
+              >
+                <div className="flex items-center gap-2">
+                  <div className="flex flex-col flex-shrink-0">
+                    <button type="button" onClick={() => moveIngredient(idx, -1)} disabled={idx === 0} className="p-0.5 text-stone-400 hover:text-stone-600 disabled:opacity-25 disabled:cursor-default transition-colors"><ChevronUp size={14} /></button>
+                    <button type="button" onClick={() => moveIngredient(idx, 1)} disabled={idx === form.ingredients.length - 1} className="p-0.5 text-stone-400 hover:text-stone-600 disabled:opacity-25 disabled:cursor-default transition-colors"><ChevronDown size={14} /></button>
+                  </div>
+                  <LayoutList size={14} className="text-stone-400 flex-shrink-0" />
+                  <span className="text-xs font-medium uppercase tracking-wide text-stone-400 sm:hidden">
+                    Section
+                  </span>
                 </div>
-                <LayoutList size={14} className="text-stone-400 flex-shrink-0" />
                 <input
                   type="text"
                   placeholder="Section name (e.g. For the sauce)"
                   value={ing.name}
                   onChange={(e) => updateIngredient(idx, { name: e.target.value })}
-                  className="flex-1 rounded-lg border border-stone-300 bg-stone-50 px-3 py-1.5 text-sm font-semibold text-stone-700 placeholder:font-normal placeholder:text-stone-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                  className="min-w-0 flex-1 rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm font-semibold text-stone-700 placeholder:font-normal placeholder:text-stone-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 sm:bg-stone-50 sm:py-1.5"
                 />
                 <button
                   type="button"
                   onClick={() => removeIngredient(idx)}
-                  className="p-1 text-stone-400 hover:text-red-500 transition-colors"
+                  className="self-end p-1.5 text-stone-400 hover:text-red-500 transition-colors sm:self-center"
+                  aria-label="Remove section"
                 >
                   <Trash2 size={16} />
                 </button>
               </div>
             ) : (
               <div key={idx} className="space-y-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="flex flex-col flex-shrink-0">
-                  <button type="button" onClick={() => moveIngredient(idx, -1)} disabled={idx === 0} className="p-0.5 text-stone-400 hover:text-stone-600 disabled:opacity-25 disabled:cursor-default transition-colors"><ChevronUp size={14} /></button>
-                  <button type="button" onClick={() => moveIngredient(idx, 1)} disabled={idx === form.ingredients.length - 1} className="p-0.5 text-stone-400 hover:text-stone-600 disabled:opacity-25 disabled:cursor-default transition-colors"><ChevronDown size={14} /></button>
-                </div>
+              <div
+                className="
+                  max-sm:grid max-sm:grid-cols-2
+                  max-sm:gap-x-2 max-sm:gap-y-2 max-sm:items-start
+                  max-sm:rounded-xl max-sm:border max-sm:border-stone-200 max-sm:bg-white max-sm:p-3 max-sm:shadow-sm
+                  sm:flex sm:flex-col sm:gap-3 sm:rounded-xl sm:border sm:border-stone-200 sm:bg-stone-50/50 sm:p-3 sm:shadow-sm
+                "
+              >
+                <div className="max-sm:contents sm:flex sm:w-full sm:flex-row sm:items-end sm:gap-2">
                 <input
                   type="number"
                   placeholder="Qty"
@@ -690,64 +703,76 @@ export function RecipeEditorPage() {
                       quantity: e.target.value ? Number(e.target.value) : null,
                     })
                   }
-                  className="w-16 rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                  className="
+                    max-sm:col-start-1 max-sm:row-start-2 max-sm:min-w-0
+                    w-full min-w-0 rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm tabular-nums focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20
+                    sm:w-[4.5rem] sm:shrink-0 sm:px-2 sm:py-2
+                  "
+                  inputMode="decimal"
                 />
                 <input
                   type="text"
                   placeholder="Unit"
                   value={ing.unit}
                   onChange={(e) => updateIngredient(idx, { unit: e.target.value })}
-                  className="w-20 rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                  className="
+                    max-sm:col-start-2 max-sm:row-start-2 max-sm:min-w-0
+                    w-full min-w-0 rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20
+                    sm:w-[5.5rem] sm:shrink-0 sm:px-2 sm:py-2
+                  "
                 />
-                <IngredientAutocomplete
-                  ingredients={masterIngredients}
-                  value={ing.name}
-                  placeholder="Ingredient name"
-                  wrapperClassName="flex-1 min-w-[180px]"
-                  className={`w-full rounded-lg border bg-white px-2 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 ${
-                    ing.masterIngredientId
-                      ? "border-brand-300 bg-brand-50/30"
-                      : "border-stone-300"
-                  }`}
-                  onChange={(v) => {
-                    updateIngredient(idx, {
-                      name: v,
-                      masterIngredientId: null,
-                      masterIngredientScope: null,
-                    });
-                    if (quickAddIdx === idx) setQuickAddIdx(null);
-                  }}
-                  onSelect={(mi) => {
-                    updateIngredient(idx, {
-                      name: mi.name,
-                      nameSecondary: mi.nameGr,
-                      masterIngredientId: mi.id,
-                      masterIngredientScope: masterScopeFromMasterIngredient(mi),
-                    });
-                    if (quickAddIdx === idx) setQuickAddIdx(null);
-                  }}
-                  onCreateNew={() => setQuickAddIdx(idx)}
-                />
-                {ing.masterIngredientId ? (
-                  <span title="Linked to catalog" className="flex-shrink-0 text-brand-500">
-                    <Link2 size={14} />
-                  </span>
-                ) : (
-                  ing.name.trim() && (
-                    <span title="Not in catalog — link to catalog for suggestions to work" className="flex-shrink-0 text-amber-400">
-                      <AlertTriangle size={14} />
-                    </span>
-                  )
-                )}
-                {noteOpenSet.has(idx) ? (
-                  <div className="flex items-center gap-1 flex-shrink-0">
+                <div
+                  className="
+                    max-sm:col-span-2 max-sm:col-start-1 max-sm:row-start-1 max-sm:min-w-0
+                    min-w-0 w-full sm:flex-1 sm:min-w-0
+                  "
+                >
+                  <IngredientAutocomplete
+                    ingredients={masterIngredients}
+                    value={ing.name}
+                    placeholder="Ingredient name"
+                    wrapperClassName="w-full"
+                    className={`w-full rounded-lg border bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 sm:min-h-[2.5rem] sm:px-3 sm:py-2 ${
+                      ing.masterIngredientId
+                        ? "border-brand-300 bg-brand-50/30"
+                        : "border-stone-300"
+                    }`}
+                    onChange={(v) => {
+                      updateIngredient(idx, {
+                        name: v,
+                        masterIngredientId: null,
+                        masterIngredientScope: null,
+                      });
+                      if (quickAddIdx === idx) setQuickAddIdx(null);
+                    }}
+                    onSelect={(mi) => {
+                      updateIngredient(idx, {
+                        name: mi.name,
+                        nameSecondary: mi.nameGr,
+                        masterIngredientId: mi.id,
+                        masterIngredientScope: masterScopeFromMasterIngredient(mi),
+                      });
+                      if (quickAddIdx === idx) setQuickAddIdx(null);
+                    }}
+                    onCreateNew={() => setQuickAddIdx(idx)}
+                  />
+                </div>
+                </div>
+                {noteOpenSet.has(idx) && (
+                  <div
+                    className="
+                      flex max-sm:col-span-2 max-sm:col-start-1 max-sm:row-start-3
+                      w-full min-w-0 items-stretch gap-2
+                      sm:w-full sm:items-center
+                    "
+                  >
                     <input
                       type="text"
-                      placeholder="e.g. diced, melted..."
+                      placeholder="Note (e.g. diced, melted)"
                       value={ing.note}
                       onChange={(e) => updateIngredient(idx, { note: e.target.value })}
                       autoFocus
-                      className="w-40 rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-sm italic text-stone-500 placeholder:text-stone-300 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                      className="min-w-0 flex-1 rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-700 placeholder:text-stone-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 sm:min-w-0 sm:flex-1 sm:px-3 sm:py-2"
                     />
                     <button
                       type="button"
@@ -755,32 +780,75 @@ export function RecipeEditorPage() {
                         updateIngredient(idx, { note: "" });
                         setNoteOpenSet((prev) => { const next = new Set(prev); next.delete(idx); return next; });
                       }}
-                      className="p-0.5 text-stone-400 hover:text-stone-600 transition-colors"
+                      className="flex h-10 w-10 flex-shrink-0 items-center justify-center self-center rounded-md text-stone-400 hover:bg-stone-100 hover:text-stone-700 transition-colors sm:h-auto sm:w-auto sm:self-auto"
                       title="Remove note"
                     >
-                      <X size={12} />
+                      <X size={14} />
                     </button>
                   </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setNoteOpenSet((prev) => new Set(prev).add(idx))}
-                    className={`p-1 transition-colors flex-shrink-0 ${
-                      ing.note ? "text-brand-500" : "text-stone-300 hover:text-stone-500"
-                    }`}
-                    title="Add note"
-                  >
-                    <MessageSquare size={14} />
-                  </button>
                 )}
-                <button
-                  type="button"
-                  onClick={() => removeIngredient(idx)}
-                  disabled={form.ingredients.length <= 1}
-                  className="p-1 text-stone-400 hover:text-red-500 disabled:opacity-30 transition-colors"
+                <div
+                  className={[
+                    "flex w-full flex-shrink-0 items-center justify-between gap-2 max-sm:col-span-2 max-sm:border-t max-sm:border-stone-100 max-sm:pt-2",
+                    noteOpenSet.has(idx) ? "max-sm:row-start-4" : "max-sm:row-start-3",
+                    "sm:border-t sm:border-stone-200 sm:pt-2",
+                  ].join(" ")}
                 >
-                  <Trash2 size={16} />
-                </button>
+                  <div className="flex flex-row items-center gap-0.5" aria-label="Reorder ingredient">
+                    <button
+                      type="button"
+                      onClick={() => moveIngredient(idx, -1)}
+                      disabled={idx === 0}
+                      className="rounded-md p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-600 disabled:opacity-25 disabled:cursor-default transition-colors"
+                      title="Move up"
+                    >
+                      <ChevronUp size={16} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveIngredient(idx, 1)}
+                      disabled={idx === form.ingredients.length - 1}
+                      className="rounded-md p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-600 disabled:opacity-25 disabled:cursor-default transition-colors"
+                      title="Move down"
+                    >
+                      <ChevronDown size={16} />
+                    </button>
+                  </div>
+                  <div className="flex flex-shrink-0 items-center gap-0.5">
+                    {ing.masterIngredientId ? (
+                      <span title="Linked to catalog" className="inline-flex p-1.5 text-brand-500">
+                        <Link2 size={14} />
+                      </span>
+                    ) : (
+                      ing.name.trim() && (
+                        <span title="Not in catalog — link to catalog for suggestions to work" className="inline-flex p-1.5 text-amber-400">
+                          <AlertTriangle size={14} />
+                        </span>
+                      )
+                    )}
+                    {!noteOpenSet.has(idx) && (
+                      <button
+                        type="button"
+                        onClick={() => setNoteOpenSet((prev) => new Set(prev).add(idx))}
+                        className={`rounded-md p-1.5 transition-colors ${
+                          ing.note ? "text-brand-500" : "text-stone-400 hover:bg-stone-100 hover:text-stone-600 sm:text-stone-300 sm:hover:bg-transparent sm:hover:text-stone-500"
+                        }`}
+                        title="Add note"
+                      >
+                        <MessageSquare size={14} />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => removeIngredient(idx)}
+                      disabled={form.ingredients.length <= 1}
+                      className="inline-flex items-center justify-center rounded-lg border border-stone-200 bg-stone-50 p-2 text-stone-500 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:pointer-events-none disabled:opacity-30"
+                      aria-label="Remove ingredient"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
               </div>
               {quickAddIdx === idx && (
                 <IngredientQuickAdd

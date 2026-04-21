@@ -340,7 +340,7 @@ export function RecipeDetailPage() {
                   <li
                     key={i}
                     onClick={toggleChecked}
-                    className={`flex items-center gap-2.5 rounded-lg px-2 py-2 cursor-pointer select-none transition-colors ${
+                    className={`flex items-start gap-2.5 rounded-lg px-2 py-2 cursor-pointer select-none transition-colors sm:gap-2.5 ${
                       checked ? "opacity-50" : ""
                     } ${
                       inPantry
@@ -352,50 +352,56 @@ export function RecipeDetailPage() {
                       type="checkbox"
                       checked={checked}
                       readOnly
-                      className="h-4 w-4 flex-shrink-0 rounded border-stone-300 text-brand-600 focus:ring-brand-500 pointer-events-none"
+                      className="mt-0.5 h-4 w-4 flex-shrink-0 rounded border-stone-300 text-brand-600 focus:ring-brand-500 pointer-events-none"
                     />
-                    <span className="flex-shrink-0 w-[4.5rem]">
-                      {(ing.quantity || ing.unit) ? (
-                        <span className="inline-flex items-baseline gap-1 px-2 py-0.5 w-full">
-                          {ing.quantity && (
-                            <span className="text-sm font-bold tabular-nums text-stone-900">
-                              {ing.quantity}
-                            </span>
-                          )}
-                          {ing.unit && (
-                            <span className="text-[11px] text-stone-500 truncate">
-                              {ing.unit}
-                            </span>
-                          )}
+                    <span
+                      className="inline-flex w-[4.5rem] flex-shrink-0 items-baseline gap-1 overflow-hidden pt-0.5 text-ellipsis whitespace-nowrap"
+                      title={
+                        [ing.quantity != null ? String(ing.quantity) : "", ing.unit || ""]
+                          .join(" ")
+                          .trim() || undefined
+                      }
+                    >
+                      {ing.quantity != null && (
+                        <span className="text-sm font-bold tabular-nums text-stone-900">
+                          {ing.quantity}
                         </span>
-                      ) : (
-                        <span className="inline-block w-full" />
                       )}
+                      {ing.unit ? (
+                        <span className="min-w-0 truncate text-[11px] text-stone-500">
+                          {ing.unit}
+                        </span>
+                      ) : null}
+                      {ing.quantity == null && !ing.unit ? (
+                        <span className="block min-h-[1.25em] w-full" aria-hidden />
+                      ) : null}
                     </span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex flex-wrap items-center gap-x-1.5">
-                        <span className={`text-sm font-medium ${checked ? "line-through text-stone-400" : "text-stone-800"}`}>
+                    <div className="min-w-0 flex-1 pt-0.5">
+                      <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+                        <span
+                          className={`min-w-0 max-w-full text-sm font-medium break-words [overflow-wrap:anywhere] ${checked ? "line-through text-stone-400" : "text-stone-800"}`}
+                        >
                           {ing.name}
                         </span>
                         {ing.masterIngredientId && (
-                          <span className="inline-flex text-brand-400" title="From catalog">
+                          <span className="inline-flex shrink-0 text-brand-400" title="From catalog">
                             <Link2 size={12} />
                           </span>
                         )}
                         {ing.nameSecondary && (
-                          <span className="text-sm italic text-stone-400">
+                          <span className="min-w-0 max-w-full break-words text-sm italic text-stone-400 [overflow-wrap:anywhere]">
                             ({ing.nameSecondary})
                           </span>
                         )}
                       </div>
                       {ing.note && (
-                        <p className="text-xs text-stone-400 italic mt-0.5 leading-snug">
+                        <p className="mt-0.5 text-xs text-stone-400 italic leading-snug break-words [overflow-wrap:anywhere]">
                           {ing.note}
                         </p>
                       )}
                     </div>
                     {inPantry && (
-                      <span className="flex-shrink-0 text-green-600" title="In pantry">
+                      <span className="mt-0.5 flex-shrink-0 text-green-600" title="In pantry">
                         <Package size={16} />
                       </span>
                     )}
