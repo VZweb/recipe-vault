@@ -1242,8 +1242,9 @@ export function PantryPage() {
                           </div>
 
                           {/* Edit: Actions */}
-                          <div className="flex items-center gap-2 pt-1">
+                          <div className="flex flex-wrap items-center gap-2 pt-1">
                             <button
+                              type="button"
                               onClick={() => saveEdit(item)}
                               disabled={
                                 !editState.name.trim() || saving
@@ -1256,11 +1257,29 @@ export function PantryPage() {
                               Save
                             </button>
                             <button
+                              type="button"
                               onClick={cancelEditing}
                               disabled={saving}
                               className="rounded-lg px-3 py-1.5 text-xs text-stone-500 hover:bg-stone-100 transition-colors"
                             >
                               Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleStaple(item)}
+                              disabled={saving}
+                              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                                item.isStaple
+                                  ? "border border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100"
+                                  : "border border-stone-200 bg-white text-stone-600 hover:bg-stone-50"
+                              }`}
+                              title={
+                                item.isStaple
+                                  ? "Remove staple"
+                                  : "Mark as staple"
+                              }
+                            >
+                              {item.isStaple ? "Unstaple" : "Staple"}
                             </button>
                           </div>
                         </div>
@@ -1315,7 +1334,7 @@ export function PantryPage() {
                                       className="h-9 w-9 rounded-md object-cover border border-stone-200 flex-shrink-0"
                                     />
                                   )}
-                                  <div className="min-w-0 flex-1">
+                                  <div className="min-w-0 flex-1 flex flex-col">
                                     <div className="flex items-center gap-2 flex-wrap">
                                       <span className="text-sm font-medium text-stone-800">
                                         {item.name}
@@ -1327,28 +1346,11 @@ export function PantryPage() {
                                       )}
                                       {item.masterIngredientId && (
                                         <span
-                                          className="text-brand-400"
+                                          className="inline-flex shrink-0 text-brand-500"
                                           title="Linked to catalog"
+                                          aria-label="Linked to catalog"
                                         >
-                                          <Link2 size={12} />
-                                        </span>
-                                      )}
-                                      {item.isStaple && (
-                                        <span
-                                          className="inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700"
-                                          title="Staple"
-                                          aria-label="Staple"
-                                        >
-                                          <Paperclip size={12} strokeWidth={2.25} aria-hidden />
-                                        </span>
-                                      )}
-                                      {item.isOpened && (
-                                        <span
-                                          className="inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-sky-100 text-sky-800"
-                                          title="Opened"
-                                          aria-label="Opened pack"
-                                        >
-                                          <PackageOpen size={12} strokeWidth={2.25} aria-hidden />
+                                          <Link2 size={14} aria-hidden />
                                         </span>
                                       )}
                                     </div>
@@ -1358,19 +1360,6 @@ export function PantryPage() {
                                         {item.unit ? ` ${item.unit}` : ""}
                                       </span>
                                     )}
-                                    {item.expiresOn &&
-                                      expStatus === "ok" &&
-                                      !alertMsg && (
-                                        <span className="text-xs text-stone-500 mt-1 flex items-center gap-1">
-                                          <Calendar
-                                            size={12}
-                                            className="flex-shrink-0"
-                                            aria-hidden
-                                          />
-                                          Expires{" "}
-                                          {formatExpiresOnLabel(item.expiresOn)}
-                                        </span>
-                                      )}
                                     {alertMsg && (
                                       <span
                                         className={`text-xs mt-1 flex items-center gap-1 font-medium ${
@@ -1399,39 +1388,70 @@ export function PantryPage() {
                                 </div>
                               </button>
 
-                              <div className="flex items-center gap-0.5 flex-shrink-0 pt-0.5">
-                                <button
-                                  type="button"
-                                  onClick={() => startEditing(item)}
-                                  className="p-1.5 text-stone-400 hover:text-brand-600 transition-colors rounded-md hover:bg-stone-100"
-                                  title="Edit item"
-                                >
-                                  <Pencil size={14} />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleToggleStaple(item)}
-                                  className={`text-xs px-2 py-1 rounded transition-colors ${
-                                    item.isStaple
-                                      ? "text-amber-600 hover:bg-amber-50"
-                                      : "text-stone-400 hover:bg-stone-50"
-                                  }`}
-                                  title={
-                                    item.isStaple
-                                      ? "Remove staple"
-                                      : "Mark as staple"
-                                  }
-                                >
-                                  {item.isStaple ? "Unstaple" : "Staple"}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleDelete(item.id)}
-                                  className="p-1.5 text-stone-400 hover:text-red-500 transition-colors rounded-md hover:bg-stone-100"
-                                  aria-label={`Remove ${item.name}`}
-                                >
-                                  <Trash2 size={16} />
-                                </button>
+                              <div className="flex flex-col items-end gap-1.5 flex-shrink-0 pt-0.5">
+                                <div className="flex items-center gap-0.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => startEditing(item)}
+                                    className="p-1.5 text-stone-400 hover:text-brand-600 transition-colors rounded-md hover:bg-stone-100"
+                                    title="Edit item"
+                                  >
+                                    <Pencil size={14} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDelete(item.id)}
+                                    className="p-1.5 text-stone-400 hover:text-red-500 transition-colors rounded-md hover:bg-stone-100"
+                                    aria-label={`Remove ${item.name}`}
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                </div>
+                                {(item.isOpened ||
+                                  item.isStaple ||
+                                  item.expiresOn) && (
+                                  <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-0.5 pr-0.5">
+                                    {item.isOpened ? (
+                                      <span
+                                        className="inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-sky-100 text-sky-800"
+                                        title="Opened"
+                                        aria-label="Opened pack"
+                                      >
+                                        <PackageOpen
+                                          size={12}
+                                          strokeWidth={2.25}
+                                          aria-hidden
+                                        />
+                                      </span>
+                                    ) : null}
+                                    {item.isStaple ? (
+                                      <span
+                                        className="inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700"
+                                        title="Staple"
+                                        aria-label="Staple"
+                                      >
+                                        <Paperclip
+                                          size={12}
+                                          strokeWidth={2.25}
+                                          aria-hidden
+                                        />
+                                      </span>
+                                    ) : null}
+                                    {item.expiresOn ? (
+                                      <span
+                                        className="inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-stone-100 text-stone-600"
+                                        title="Expiry date set"
+                                        aria-label="Has expiry date"
+                                      >
+                                        <Calendar
+                                          size={12}
+                                          className="flex-shrink-0"
+                                          aria-hidden
+                                        />
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                )}
                               </div>
                             </div>
 

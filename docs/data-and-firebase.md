@@ -42,9 +42,19 @@ Deleting a recipe removes linked Storage objects best-effort (`deleteRecipe` + `
 
 ### Pantry
 
-Pantry items reference `masterIngredientId` and `masterIngredientScope` when linked to the shared catalog or custom ingredients. Deleting a pantry item removes its `imageUrl` file from Storage when present (dynamic import of `deletePantryImage`).
+**Path:** `users/{uid}/pantry`. **Reads:** [`fetchPantryItems`](../src/lib/firestore.ts) uses `orderBy("name")`; the client then sorts by category and name for grouped display.
 
-Optional fields: `expiresOn` — a **calendar date** string in `YYYY-MM-DD` format, or omitted / `null` if unknown; `isOpened` — boolean, `false` by default for legacy documents. The client maps these in `docToPantryItem` in `src/lib/firestore.ts`.
+**Document fields (conceptual):** name, optional secondary name, normalized name, category, optional quantity and unit, `isStaple`, optional `imageUrl`, `masterIngredientId` + `masterIngredientScope` when linked to the shared catalog or user **custom** master ingredients, `note`, `addedAt`. Optional freshness: **`expiresOn`** — calendar date string **`YYYY-MM-DD`** or `null` / omitted; **`isOpened`** — boolean, default `false` for legacy docs. [`docToPantryItem`](../src/lib/firestore.ts) normalizes reads (including validating `expiresOn`). [`updatePantryItem`](../src/lib/firestore.ts) strips `undefined` from partial updates before `updateDoc` so optional clears (e.g. `expiresOn: null`) stay valid.
+
+**Deletes:** removing a pantry document also removes its Storage image when `imageUrl` is set ([`deletePantryImage`](../src/lib/storage.ts), invoked from [`deletePantryItem`](../src/lib/firestore.ts)).
+
+**Types and helpers:** [`src/types/pantry.ts`](../src/types/pantry.ts); expiry display rules and labels in [`src/lib/pantryExpiry.ts`](../src/lib/pantryExpiry.ts) (see [Domain logic](./domain-logic.md#pantry-expiry-and-opened-ux)); main UI in [`src/pages/PantryPage.tsx`](../src/pages/PantryPage.tsx). Adding from the catalog on **Ingredients** uses [`addPantryItem`](../src/lib/firestore.ts) with `expiresOn: null` and `isOpened: false`. **Suggestions** builds synthetic pantry rows with the same defaults when extras are merged ([`SuggestionsPage`](../src/pages/SuggestionsPage.tsx)).
+
+**Pantry UI (collapsed row):** Each item is a card whose **border and background** reflect expiry: neutral stone/white when there is no date or the date is outside the warning window; **amber** when the calendar date is within the configured warning days (inclusive of “expires today”); **red** when the date is in the past. The row **expands** from a primary control (`aria-expanded` / `aria-controls`) to show read-only details below. **Edit** and **Delete** sit in a column on the right; **Staple / Unstaple** is only in the **edit** form (Save / Cancel row), not on the collapsed row. Under the action buttons, an optional **icon strip** (right-aligned) shows circular chips for **Opened**, **Staple**, and **Calendar** when an expiry date exists (calendar is icon-only for “calm” future dates). The **catalog link** icon (`Link2`) appears **inline after the ingredient name** (and optional Greek name), not in that strip. **Expiry text** under the quantity appears **only** when the item is expired or inside the warning window (same copy as [`getPantryExpiryAlertMessage`](../src/lib/pantryExpiry.ts)); otherwise no line there—only the calendar chip indicates a date is set.
+
+**Pantry UI (expanded block):** A simple stacked list with dividers: expiry (value or “Not set”), **Opened** row only if `isOpened`, optional amount, optional note, and **Added** date.
+
+**Pantry UI (add / edit):** Optional expiry (`<input type="date">` → `expiresOn`), **Opened** checkbox, and the rest of the existing fields. When an item is linked to the catalog, primary and Greek name fields are read-only in edit, with the same disabled look for both.
 
 ### Master ingredients
 
