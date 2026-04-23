@@ -198,6 +198,7 @@ for (let i = 0; i < recipes.length; i++) {
         sortOrder: ing.sortOrder ?? idx,
         masterIngredientId: ing.masterIngredientId ?? null,
         masterIngredientScope: ing.masterIngredientScope ?? null,
+        substituteLinks: Array.isArray(ing.substituteLinks) ? ing.substituteLinks : [],
         note: ing.note || "",
         isSection: ing.isSection ?? false,
       })),

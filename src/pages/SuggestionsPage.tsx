@@ -14,7 +14,11 @@ import { IngredientAutocomplete } from "@/components/ui/IngredientAutocomplete";
 import type { PantryItem } from "@/types/pantry";
 import { PANTRY_CATEGORIES } from "@/types/pantry";
 import type { MasterIngredientScope } from "@/types/ingredientRef";
-import { ingredientLinkKey, masterScopeFromMasterIngredient } from "@/lib/ingredientRef";
+import {
+  ingredientLinkKey,
+  ingredientLineLinkKeys,
+  masterScopeFromMasterIngredient,
+} from "@/lib/ingredientRef";
 
 interface ExtraIngredient {
   name: string;
@@ -99,10 +103,11 @@ export function SuggestionsPage() {
       for (const ing of s.recipe.ingredients) {
         if (ing.isSection) continue;
         if (!s.matchedIngredients.includes(ing.name)) continue;
-        const lk = ingredientLinkKey(ing.masterIngredientId, ing.masterIngredientScope);
-        if (lk && extraByLinkKey.has(lk)) {
-          const name = extraByLinkKey.get(lk)!;
-          if (!hits.includes(name)) hits.push(name);
+        for (const lk of ingredientLineLinkKeys(ing)) {
+          if (extraByLinkKey.has(lk)) {
+            const name = extraByLinkKey.get(lk)!;
+            if (!hits.includes(name)) hits.push(name);
+          }
         }
       }
       if (hits.length > 0) map.set(s.recipe.id, hits);

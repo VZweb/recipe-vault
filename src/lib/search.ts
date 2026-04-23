@@ -3,7 +3,7 @@ import type { Recipe } from "@/types/recipe";
 import type { Tag } from "@/types/tag";
 import type { Category } from "@/types/category";
 import type { MasterIngredient } from "@/types/ingredient";
-import { resolveMasterIngredient } from "@/lib/ingredientRef";
+import { ingredientLinkKey, resolveMasterIngredient } from "@/lib/ingredientRef";
 
 export interface SearchableRecipe extends Recipe {
   tagNames: string[];
@@ -40,6 +40,20 @@ export function buildSearchIndex(
           if (master.nameGr && !names.includes(master.nameGr))
             names.push(master.nameGr);
           names.push(...master.aliases);
+        }
+        for (const sub of i.substituteLinks ?? []) {
+          if (!ingredientLinkKey(sub.masterIngredientId, sub.masterIngredientScope))
+            continue;
+          const sm = resolveMasterIngredient(
+            sub.masterIngredientId,
+            sub.masterIngredientScope,
+            masterIngredients
+          );
+          if (sm) {
+            names.push(sm.name);
+            if (sm.nameGr && !names.includes(sm.nameGr)) names.push(sm.nameGr);
+            names.push(...sm.aliases);
+          }
         }
         return names;
       })

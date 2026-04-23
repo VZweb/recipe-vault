@@ -17,7 +17,12 @@ import { IngredientAutocomplete } from "@/components/ui/IngredientAutocomplete";
 import { IngredientQuickAdd } from "@/components/ui/IngredientQuickAdd";
 import { TAG_CATEGORIES } from "@/types/tag";
 import type { Ingredient, Step, RecipeFormData } from "@/types/recipe";
-import { masterScopeFromMasterIngredient } from "@/lib/ingredientRef";
+import {
+  ingredientLinkKey,
+  ingredientLineLinkKeys,
+  masterScopeFromMasterIngredient,
+  resolveMasterIngredient,
+} from "@/lib/ingredientRef";
 
 function emptyIngredient(sortOrder: number): Ingredient {
   return {
@@ -28,6 +33,7 @@ function emptyIngredient(sortOrder: number): Ingredient {
     sortOrder,
     masterIngredientId: null,
     masterIngredientScope: null,
+    substituteLinks: [],
     note: "",
     isSection: false,
   };
@@ -42,6 +48,7 @@ function emptySection(sortOrder: number): Ingredient {
     sortOrder,
     masterIngredientId: null,
     masterIngredientScope: null,
+    substituteLinks: [],
     note: "",
     isSection: true,
   };
@@ -91,7 +98,13 @@ export function RecipeEditorPage() {
   const [quickAddIdx, setQuickAddIdx] = useState<number | null>(null);
   const [pasteReview, setPasteReview] = useState<Ingredient[] | null>(null);
   const [pasteReviewQuickAddIdx, setPasteReviewQuickAddIdx] = useState<number | null>(null);
+  const [substitutePickerIdx, setSubstitutePickerIdx] = useState<number | null>(null);
+  const [substitutePickerQuery, setSubstitutePickerQuery] = useState("");
   const [activeTagCategory, setActiveTagCategory] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (substitutePickerIdx === null) setSubstitutePickerQuery("");
+  }, [substitutePickerIdx]);
 
   useEffect(() => {
     if (recipe && isEditing) {
@@ -158,7 +171,10 @@ export function RecipeEditorPage() {
   };
 
   const unlinkedCount = useMemo(
-    () => form.ingredients.filter((i) => !i.isSection && i.name.trim() && !i.masterIngredientId).length,
+    () =>
+      form.ingredients.filter(
+        (i) => !i.isSection && i.name.trim() && ingredientLineLinkKeys(i).length === 0
+      ).length,
     [form.ingredients]
   );
 
@@ -201,6 +217,7 @@ export function RecipeEditorPage() {
   };
 
   const removeIngredient = (idx: number) => {
+    setSubstitutePickerIdx(null);
     setForm((prev) => ({
       ...prev,
       ingredients: prev.ingredients
@@ -210,6 +227,7 @@ export function RecipeEditorPage() {
   };
 
   const moveIngredient = (idx: number, direction: -1 | 1) => {
+    setSubstitutePickerIdx(null);
     setForm((prev) => {
       const arr = [...prev.ingredients];
       const target = idx + direction;
@@ -748,11 +766,23 @@ export function RecipeEditorPage() {
                       if (quickAddIdx === idx) setQuickAddIdx(null);
                     }}
                     onSelect={(mi) => {
+                      const pk = ingredientLinkKey(
+                        mi.id,
+                        masterScopeFromMasterIngredient(mi)
+                      );
+                      const nextSubs = (ing.substituteLinks ?? []).filter(
+                        (s) =>
+                          ingredientLinkKey(
+                            s.masterIngredientId,
+                            s.masterIngredientScope
+                          ) !== pk
+                      );
                       updateIngredient(idx, {
                         name: mi.name,
                         nameSecondary: mi.nameGr,
                         masterIngredientId: mi.id,
                         masterIngredientScope: masterScopeFromMasterIngredient(mi),
+                        substituteLinks: nextSubs,
                       });
                       if (quickAddIdx === idx) setQuickAddIdx(null);
                     }}
@@ -791,11 +821,112 @@ export function RecipeEditorPage() {
                 )}
                 <div
                   className={[
-                    "flex w-full flex-shrink-0 items-center justify-between gap-2 max-sm:col-span-2 max-sm:border-t max-sm:border-stone-100 max-sm:pt-2",
+                    "flex w-full max-w-full flex-col gap-2 max-sm:col-span-2 max-sm:border-t max-sm:border-stone-100 max-sm:pt-2",
                     noteOpenSet.has(idx) ? "max-sm:row-start-4" : "max-sm:row-start-3",
                     "sm:border-t sm:border-stone-200 sm:pt-2",
                   ].join(" ")}
                 >
+                  <div className="flex flex-wrap items-center gap-2">
+                    {(ing.substituteLinks ?? []).map((sub, si) => {
+                      const sm = resolveMasterIngredient(
+                        sub.masterIngredientId,
+                        sub.masterIngredientScope,
+                        masterIngredients
+                      );
+                      return (
+                        <span
+                          key={`${sub.masterIngredientId}-${si}`}
+                          className="inline-flex items-center gap-1 rounded-full border border-stone-200 bg-white px-2 py-0.5 text-xs text-stone-700"
+                        >
+                          <Link2 size={10} className="shrink-0 text-brand-400" />
+                          <span>{sm?.name ?? sub.masterIngredientId}</span>
+                          <button
+                            type="button"
+                            className="rounded p-0.5 text-stone-400 hover:text-red-500"
+                            aria-label="Remove alternative"
+                            onClick={() =>
+                              updateIngredient(idx, {
+                                substituteLinks: (ing.substituteLinks ?? []).filter(
+                                  (_, j) => j !== si
+                                ),
+                              })
+                            }
+                          >
+                            <X size={12} />
+                          </button>
+                        </span>
+                      );
+                    })}
+                    {substitutePickerIdx === idx ? (
+                      <div className="min-w-0 flex-1 basis-full sm:basis-[min(100%,24rem)]">
+                        <IngredientAutocomplete
+                          ingredients={masterIngredients}
+                          value={substitutePickerQuery}
+                          placeholder="Type to pick alternative…"
+                          wrapperClassName="w-full"
+                          className="w-full rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-xs focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                          onChange={setSubstitutePickerQuery}
+                          onSelect={(mi) => {
+                            const pk = ingredientLinkKey(
+                              ing.masterIngredientId,
+                              ing.masterIngredientScope
+                            );
+                            const sk = ingredientLinkKey(
+                              mi.id,
+                              masterScopeFromMasterIngredient(mi)
+                            );
+                            if (pk && sk && pk === sk) {
+                              setSubstitutePickerIdx(null);
+                              return;
+                            }
+                            if (
+                              (ing.substituteLinks ?? []).some(
+                                (s) =>
+                                  ingredientLinkKey(
+                                    s.masterIngredientId,
+                                    s.masterIngredientScope
+                                  ) === sk
+                              )
+                            ) {
+                              setSubstitutePickerIdx(null);
+                              return;
+                            }
+                            updateIngredient(idx, {
+                              substituteLinks: [
+                                ...(ing.substituteLinks ?? []),
+                                {
+                                  masterIngredientId: mi.id,
+                                  masterIngredientScope:
+                                    masterScopeFromMasterIngredient(mi),
+                                },
+                              ],
+                            });
+                            setSubstitutePickerIdx(null);
+                          }}
+                        />
+                        <button
+                          type="button"
+                          className="mt-1 text-xs text-stone-500 hover:text-stone-700"
+                          onClick={() => setSubstitutePickerIdx(null)}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSubstitutePickerIdx(idx);
+                          setSubstitutePickerQuery("");
+                        }}
+                        className="inline-flex items-center gap-1 rounded-md border border-dashed border-stone-300 bg-white/80 px-2 py-1 text-xs font-medium text-stone-600 hover:border-brand-300 hover:bg-brand-50/40 hover:text-brand-800"
+                      >
+                        <Plus size={12} />
+                        Add alternative
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex w-full flex-shrink-0 items-center justify-between gap-2">
                   <div className="flex flex-row items-center gap-0.5" aria-label="Reorder ingredient">
                     <button
                       type="button"
@@ -817,13 +948,13 @@ export function RecipeEditorPage() {
                     </button>
                   </div>
                   <div className="flex flex-shrink-0 items-center gap-0.5">
-                    {ing.masterIngredientId ? (
-                      <span title="Linked to catalog" className="inline-flex p-1.5 text-brand-500">
+                    {ingredientLineLinkKeys(ing).length > 0 ? (
+                      <span title="Linked to catalog (primary or alternative)" className="inline-flex p-1.5 text-brand-500">
                         <Link2 size={14} />
                       </span>
                     ) : (
                       ing.name.trim() && (
-                        <span title="Not in catalog — link to catalog for suggestions to work" className="inline-flex p-1.5 text-amber-400">
+                        <span title="Not linked — link the ingredient or add an alternative for suggestions" className="inline-flex p-1.5 text-amber-400">
                           <AlertTriangle size={14} />
                         </span>
                       )
@@ -850,6 +981,7 @@ export function RecipeEditorPage() {
                       <Trash2 size={16} />
                     </button>
                   </div>
+                  </div>
                 </div>
               </div>
               {quickAddIdx === idx && (
@@ -858,11 +990,23 @@ export function RecipeEditorPage() {
                   ingredients={masterIngredients}
                   onCreate={addCatalogIngredient}
                   onCreated={(mi) => {
+                    const pk = ingredientLinkKey(
+                      mi.id,
+                      masterScopeFromMasterIngredient(mi)
+                    );
+                    const nextSubs = (ing.substituteLinks ?? []).filter(
+                      (s) =>
+                        ingredientLinkKey(
+                          s.masterIngredientId,
+                          s.masterIngredientScope
+                        ) !== pk
+                    );
                     updateIngredient(idx, {
                       name: mi.name,
                       nameSecondary: mi.nameGr,
                       masterIngredientId: mi.id,
-                      masterIngredientScope: "catalog",
+                      masterIngredientScope: masterScopeFromMasterIngredient(mi),
+                      substituteLinks: nextSubs,
                     });
                     setQuickAddIdx(null);
                   }}
@@ -877,8 +1021,8 @@ export function RecipeEditorPage() {
           <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
             <AlertTriangle size={14} className="mt-0.5 flex-shrink-0 text-amber-500" />
             <p>
-              <span className="font-semibold">{unlinkedCount}</span> ingredient{unlinkedCount > 1 ? "s" : ""} not linked to the catalog.
-              {" "}Unlinked ingredients won't appear in suggestions. Select from the dropdown or create new catalog entries.
+              <span className="font-semibold">{unlinkedCount}</span> ingredient{unlinkedCount > 1 ? "s" : ""} with no catalog link on the line (neither primary nor alternative).
+              {" "}Those lines won't appear in suggestions. Pick from the dropdown or add alternatives.
             </p>
           </div>
         )}
@@ -977,12 +1121,21 @@ export function RecipeEditorPage() {
                         if (i.isSection) return i;
                         if (nsIdx === pasteReviewQuickAddIdx) {
                           nsIdx++;
+                          const pk = ingredientLinkKey(mi.id, "catalog");
+                          const nextSubs = (i.substituteLinks ?? []).filter(
+                            (s) =>
+                              ingredientLinkKey(
+                                s.masterIngredientId,
+                                s.masterIngredientScope
+                              ) !== pk
+                          );
                           return {
                             ...i,
                             name: mi.name,
                             nameSecondary: mi.nameGr,
                             masterIngredientId: mi.id,
                             masterIngredientScope: "catalog",
+                            substituteLinks: nextSubs,
                           };
                         }
                         nsIdx++;

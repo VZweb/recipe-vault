@@ -47,6 +47,26 @@ function normalizeIngredientScope(raw: unknown): MasterIngredientScope {
   return null;
 }
 
+function normalizeSubstituteLinks(raw: unknown): {
+  masterIngredientId: string;
+  masterIngredientScope: MasterIngredientScope;
+}[] {
+  if (!Array.isArray(raw)) return [];
+  const out: { masterIngredientId: string; masterIngredientScope: MasterIngredientScope }[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const o = item as Record<string, unknown>;
+    const id =
+      typeof o.masterIngredientId === "string" ? o.masterIngredientId.trim() : "";
+    if (!id) continue;
+    out.push({
+      masterIngredientId: id,
+      masterIngredientScope: normalizeIngredientScope(o.masterIngredientScope),
+    });
+  }
+  return out;
+}
+
 function docToRecipe(id: string, data: DocumentData): Recipe {
   return {
     id,
@@ -65,6 +85,7 @@ function docToRecipe(id: string, data: DocumentData): Recipe {
       nameSecondary: ing.nameSecondary ?? "",
       masterIngredientId: ing.masterIngredientId ?? null,
       masterIngredientScope: normalizeIngredientScope(ing.masterIngredientScope),
+      substituteLinks: normalizeSubstituteLinks(ing.substituteLinks),
       note: (ing.note as string) ?? "",
       isSection: (ing.isSection as boolean) ?? false,
     })),

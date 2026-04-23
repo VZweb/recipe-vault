@@ -18,14 +18,19 @@ import { useRecipe, useRecipeMutations } from "@/hooks/useRecipes";
 import { useTags } from "@/hooks/useTags";
 import { useCategories } from "@/hooks/useCategories";
 import { fetchPantryItems } from "@/lib/firestore";
-import { ingredientLinkKey } from "@/lib/ingredientRef";
+import {
+  ingredientLinkKey,
+  ingredientLineLinkKeys,
+  resolveMasterIngredient,
+} from "@/lib/ingredientRef";
 import { Button } from "@/components/ui/Button";
 import { TagChip } from "@/components/ui/TagChip";
 import { CategoryIcon } from "@/components/ui/CategoryIcon";
 import { Spinner } from "@/components/ui/Spinner";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import type { PantryItem } from "@/types/pantry";
-import type { MasterIngredientScope } from "@/types/ingredientRef";
+import type { Ingredient } from "@/types/recipe";
+import { useIngredients } from "@/hooks/useIngredients";
 
 export function RecipeDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -33,6 +38,7 @@ export function RecipeDetailPage() {
   const { recipe, loading, error } = useRecipe(id);
   const { tags } = useTags();
   const { categories } = useCategories();
+  const { ingredients: masterIngredients } = useIngredients();
   const { remove, create, incrementCooked } = useRecipeMutations();
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [imageIdx, setImageIdx] = useState(0);
@@ -71,16 +77,37 @@ export function RecipeDetailPage() {
   );
 
   const isInPantry = useCallback(
-    (
-      _name: string,
-      _nameSecondary: string | undefined,
-      masterIngredientId: string | null | undefined,
-      masterIngredientScope: MasterIngredientScope
-    ) => {
-      const k = ingredientLinkKey(masterIngredientId ?? null, masterIngredientScope);
-      return k !== null && pantryLinkKeys.has(k);
+    (ing: Pick<Ingredient, "masterIngredientId" | "masterIngredientScope" | "substituteLinks">) =>
+      ingredientLineLinkKeys(ing).some((k) => pantryLinkKeys.has(k)),
+    [pantryLinkKeys]
+  );
+
+  const pantryMatchKind = useCallback(
+    (ing: Pick<Ingredient, "masterIngredientId" | "masterIngredientScope" | "substituteLinks">) => {
+      const keys = ingredientLineLinkKeys(ing);
+      if (!keys.some((k) => pantryLinkKeys.has(k))) return "none" as const;
+      const primary = ingredientLinkKey(ing.masterIngredientId, ing.masterIngredientScope);
+      if (primary && pantryLinkKeys.has(primary)) return "primary" as const;
+      return "substitute" as const;
     },
     [pantryLinkKeys]
+  );
+
+  const matchedSubstituteName = useCallback(
+    (ing: Pick<Ingredient, "substituteLinks">) => {
+      for (const sub of ing.substituteLinks ?? []) {
+        const k = ingredientLinkKey(sub.masterIngredientId, sub.masterIngredientScope);
+        if (!k || !pantryLinkKeys.has(k)) continue;
+        const mi = resolveMasterIngredient(
+          sub.masterIngredientId,
+          sub.masterIngredientScope,
+          masterIngredients
+        );
+        return mi?.name ?? null;
+      }
+      return null;
+    },
+    [pantryLinkKeys, masterIngredients]
   );
 
   if (loading) {
@@ -309,7 +336,7 @@ export function RecipeDetailPage() {
             </h2>
             {pantryItems.length > 0 && (
               <span className="text-xs text-stone-400">
-                {recipe.ingredients.filter((ing) => !ing.isSection && isInPantry(ing.name, ing.nameSecondary, ing.masterIngredientId, ing.masterIngredientScope)).length}
+                {recipe.ingredients.filter((ing) => !ing.isSection && isInPantry(ing)).length}
                 /{recipe.ingredients.filter((ing) => !ing.isSection).length} in pantry
               </span>
             )}
@@ -327,7 +354,9 @@ export function RecipeDetailPage() {
                     </li>
                   );
                 }
-                const inPantry = isInPantry(ing.name, ing.nameSecondary, ing.masterIngredientId, ing.masterIngredientScope);
+                const inPantry = isInPantry(ing);
+                const matchKind = pantryMatchKind(ing);
+                const subPantryName = matchKind === "substitute" ? matchedSubstituteName(ing) : null;
                 const checked = checkedIngredients.has(i);
                 const toggleChecked = () =>
                   setCheckedIngredients((prev) => {
@@ -401,7 +430,14 @@ export function RecipeDetailPage() {
                       )}
                     </div>
                     {inPantry && (
-                      <span className="mt-0.5 flex-shrink-0 text-green-600" title="In pantry">
+                      <span
+                        className="mt-0.5 flex-shrink-0 text-green-600"
+                        title={
+                          matchKind === "substitute" && subPantryName
+                            ? `In pantry (matched alternative: ${subPantryName})`
+                            : "In pantry"
+                        }
+                      >
                         <Package size={16} />
                       </span>
                     )}

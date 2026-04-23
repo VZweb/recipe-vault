@@ -203,6 +203,7 @@ export function parseIngredientText(
         sortOrder,
         masterIngredientId: null,
         masterIngredientScope: null,
+        substituteLinks: [],
         note: "",
         isSection: true,
       });
@@ -224,6 +225,7 @@ export function parseIngredientText(
           ? "custom"
           : "catalog"
         : null,
+      substituteLinks: [],
       note: parsed.note,
       isSection: false,
     });

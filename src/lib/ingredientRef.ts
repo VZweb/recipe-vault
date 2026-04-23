@@ -53,3 +53,17 @@ export function recipeIngredientLinkKey(
 ): string | null {
   return ingredientLinkKey(ing.masterIngredientId, ing.masterIngredientScope);
 }
+
+/** All stable link keys for pantry/suggestion matching (primary + substitutes, deduped). */
+export function ingredientLineLinkKeys(
+  ing: Pick<Ingredient, "masterIngredientId" | "masterIngredientScope" | "substituteLinks">
+): string[] {
+  const keys = new Set<string>();
+  const primary = ingredientLinkKey(ing.masterIngredientId, ing.masterIngredientScope);
+  if (primary) keys.add(primary);
+  for (const sub of ing.substituteLinks ?? []) {
+    const k = ingredientLinkKey(sub.masterIngredientId, sub.masterIngredientScope);
+    if (k) keys.add(k);
+  }
+  return [...keys];
+}

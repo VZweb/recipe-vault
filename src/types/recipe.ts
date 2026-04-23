@@ -1,5 +1,11 @@
 import type { MasterIngredientScope } from "./ingredientRef";
 
+/** Another catalog/custom master that satisfies the same recipe line for pantry matching. */
+export interface IngredientSubstituteLink {
+  masterIngredientId: string;
+  masterIngredientScope: MasterIngredientScope;
+}
+
 export interface Ingredient {
   name: string;
   nameSecondary: string;
@@ -9,6 +15,8 @@ export interface Ingredient {
   masterIngredientId: string | null;
   /** `catalog` = ingredientCatalog; `custom` = users/{uid}/customIngredients; null = legacy / unlinked */
   masterIngredientScope: MasterIngredientScope;
+  /** Optional extra master links; pantry/suggestions match if any primary or substitute key is in pantry. */
+  substituteLinks: IngredientSubstituteLink[];
   note: string;
   isSection: boolean;
 }

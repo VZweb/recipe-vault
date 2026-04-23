@@ -1,6 +1,6 @@
 import type { Recipe } from "@/types/recipe";
 import type { PantryItem } from "@/types/pantry";
-import { ingredientLinkKey } from "@/lib/ingredientRef";
+import { ingredientLinkKey, ingredientLineLinkKeys } from "@/lib/ingredientRef";
 
 export interface SuggestionResult {
   recipe: Recipe;
@@ -27,8 +27,9 @@ export function suggestRecipes(
 
     for (const ing of recipe.ingredients) {
       if (ing.isSection) continue;
-      const k = ingredientLinkKey(ing.masterIngredientId, ing.masterIngredientScope);
-      if (k && allLinkKeys.has(k)) {
+      const keys = ingredientLineLinkKeys(ing);
+      const anyMatch = keys.some((k) => allLinkKeys.has(k));
+      if (anyMatch) {
         matched.push(ing.name);
       } else {
         missing.push(ing.name);
