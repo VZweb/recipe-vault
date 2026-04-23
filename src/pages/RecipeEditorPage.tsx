@@ -691,7 +691,8 @@ export function RecipeEditorPage() {
                   sm:flex sm:flex-col sm:gap-3 sm:rounded-xl sm:border sm:border-stone-200 sm:bg-stone-50/50 sm:p-3 sm:shadow-sm
                 "
               >
-                <div className="max-sm:contents sm:flex sm:w-full sm:flex-row sm:items-end sm:gap-2">
+                <div className="max-sm:contents sm:flex sm:w-full sm:flex-row sm:items-end sm:gap-x-0.5 sm:gap-y-0">
+                <div className="max-sm:contents sm:flex sm:shrink-0 sm:items-end sm:gap-x-1">
                 <input
                   type="number"
                   placeholder="Qty"
@@ -721,6 +722,7 @@ export function RecipeEditorPage() {
                     sm:w-[5.5rem] sm:shrink-0 sm:px-2 sm:py-2
                   "
                 />
+                </div>
                 <div
                   className="
                     max-sm:col-span-2 max-sm:col-start-1 max-sm:row-start-1 max-sm:min-w-0

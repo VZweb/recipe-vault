@@ -69,6 +69,8 @@ export function SuggestionsPage() {
         masterIngredientId: e.masterIngredientId ?? "",
         masterIngredientScope: e.masterIngredientScope,
         note: "",
+        expiresOn: null,
+        isOpened: false,
         addedAt: new Date(),
       })),
     ],

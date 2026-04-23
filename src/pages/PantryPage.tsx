@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  AlertTriangle,
+  Calendar,
   Camera,
   ChevronDown,
   ChevronRight,
@@ -10,6 +12,8 @@ import {
   Link,
   Link2,
   Package,
+  PackageOpen,
+  Paperclip,
   Pencil,
   Plus,
   Search,
@@ -37,6 +41,23 @@ import type { PantryItem, PantryCategory } from "@/types/pantry";
 import { PANTRY_CATEGORIES, PANTRY_UNITS } from "@/types/pantry";
 import type { MasterIngredientScope } from "@/types/ingredientRef";
 import { ingredientLinkKey, masterScopeFromMasterIngredient } from "@/lib/ingredientRef";
+import {
+  formatExpiresOnLabel,
+  getPantryExpiryAlertMessage,
+  getPantryExpiryDisplayStatus,
+  type PantryExpiryDisplayStatus,
+} from "@/lib/pantryExpiry";
+
+function pantryExpiryCardClasses(status: PantryExpiryDisplayStatus): string {
+  switch (status) {
+    case "expired":
+      return "border-red-300 bg-red-50/70";
+    case "expiringSoon":
+      return "border-amber-300 bg-amber-50/70";
+    default:
+      return "border-stone-200 bg-white";
+  }
+}
 
 interface EditState {
   name: string;
@@ -46,6 +67,8 @@ interface EditState {
   masterIngredientId: string | null;
   masterIngredientScope: MasterIngredientScope;
   note: string;
+  expiresOn: string;
+  isOpened: boolean;
   imageFile: File | null;
   imagePreview: string | null;
   removeImage: boolean;
@@ -73,6 +96,8 @@ export function PantryPage() {
   const [newMasterIngredientScope, setNewMasterIngredientScope] =
     useState<MasterIngredientScope>(null);
   const [newNote, setNewNote] = useState("");
+  const [newExpiresOn, setNewExpiresOn] = useState("");
+  const [newIsOpened, setNewIsOpened] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [quickAddName, setQuickAddName] = useState<string | null>(null);
@@ -90,6 +115,7 @@ export function PantryPage() {
   const [clearEverythingConfirm, setClearEverythingConfirm] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -148,6 +174,8 @@ export function PantryPage() {
       const unit = newUnit || null;
       const nameSecondary = newNameSecondary.trim() || null;
 
+      const expiresOn = newExpiresOn.trim() || null;
+
       const id = await addPantryItem({
         name: newName.trim(),
         nameSecondary,
@@ -160,6 +188,8 @@ export function PantryPage() {
         masterIngredientId: newMasterIngredientId!,
         masterIngredientScope: newMasterIngredientScope,
         note: newNote.trim(),
+        expiresOn,
+        isOpened: newIsOpened,
       });
 
       let imageUrl: string | null = null;
@@ -186,6 +216,8 @@ export function PantryPage() {
           masterIngredientId: newMasterIngredientId!,
           masterIngredientScope: newMasterIngredientScope,
           note: newNote.trim(),
+          expiresOn,
+          isOpened: newIsOpened,
           addedAt: new Date(),
         },
       ]);
@@ -198,6 +230,8 @@ export function PantryPage() {
       setNewMasterIngredientId(null);
       setNewMasterIngredientScope(null);
       setNewNote("");
+      setNewExpiresOn("");
+      setNewIsOpened(false);
       clearImageSelection();
     } finally {
       setSubmitting(false);
@@ -261,6 +295,7 @@ export function PantryPage() {
   };
 
   const startEditing = (item: PantryItem) => {
+    setExpandedItemId(null);
     setEditingItemId(item.id);
     setEditState({
       name: item.name,
@@ -270,6 +305,8 @@ export function PantryPage() {
       masterIngredientId: item.masterIngredientId,
       masterIngredientScope: item.masterIngredientScope,
       note: item.note ?? "",
+      expiresOn: item.expiresOn ?? "",
+      isOpened: item.isOpened,
       imageFile: null,
       imagePreview: null,
       removeImage: false,
@@ -342,6 +379,14 @@ export function PantryPage() {
         updates.note = trimmedNote;
       }
 
+      const nextExpiresOn = editState.expiresOn.trim() || null;
+      if (nextExpiresOn !== (item.expiresOn ?? null)) {
+        updates.expiresOn = nextExpiresOn;
+      }
+      if (editState.isOpened !== item.isOpened) {
+        updates.isOpened = editState.isOpened;
+      }
+
       let newImageUrl = item.imageUrl;
 
       if (editState.removeImage && item.imageUrl) {
@@ -382,6 +427,8 @@ export function PantryPage() {
                   ? editState.masterIngredientScope
                   : null,
                 note: trimmedNote,
+                expiresOn: nextExpiresOn,
+                isOpened: editState.isOpened,
               }
             : i
         )
@@ -583,6 +630,7 @@ export function PantryPage() {
 
                   setSubmitting(true);
                   try {
+                    const expiresOn = newExpiresOn.trim() || null;
                     const id = await addPantryItem({
                       name: mi.name,
                       nameSecondary: mi.nameGr || null,
@@ -595,6 +643,8 @@ export function PantryPage() {
                       masterIngredientId: mi.id,
                       masterIngredientScope: "catalog",
                       note: newNote.trim(),
+                      expiresOn,
+                      isOpened: newIsOpened,
                     });
 
                     setItems((prev) => [
@@ -612,6 +662,8 @@ export function PantryPage() {
                         masterIngredientId: mi.id,
                         masterIngredientScope: "catalog" as const,
                         note: newNote.trim(),
+                        expiresOn,
+                        isOpened: newIsOpened,
                         addedAt: new Date(),
                       },
                     ]);
@@ -624,6 +676,8 @@ export function PantryPage() {
                     setNewMasterIngredientId(null);
                     setNewMasterIngredientScope(null);
                     setNewNote("");
+                    setNewExpiresOn("");
+                    setNewIsOpened(false);
                     clearImageSelection();
                   } finally {
                     setSubmitting(false);
@@ -698,6 +752,30 @@ export function PantryPage() {
                 onChange={(e) => setNewNote(e.target.value)}
                 className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2.5 text-sm text-stone-700 placeholder:text-stone-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-colors"
               />
+            </div>
+
+            {/* Expiry & opened */}
+            <div className="flex flex-col sm:flex-row gap-4 sm:items-end">
+              <div className="space-y-1.5 flex-1">
+                <label className="text-xs font-medium uppercase tracking-wider text-stone-500">
+                  Expiry date
+                </label>
+                <input
+                  type="date"
+                  value={newExpiresOn}
+                  onChange={(e) => setNewExpiresOn(e.target.value)}
+                  className="w-full max-w-xs rounded-lg border border-stone-300 bg-white px-3 py-2.5 text-sm text-stone-700 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                />
+              </div>
+              <label className="flex items-center gap-2 text-sm text-stone-600 pb-2.5 sm:pb-0">
+                <input
+                  type="checkbox"
+                  checked={newIsOpened}
+                  onChange={(e) => setNewIsOpened(e.target.checked)}
+                  className="h-4 w-4 rounded border-stone-300 text-brand-600 focus:ring-brand-500"
+                />
+                Opened (e.g. partial pack)
+              </label>
             </div>
 
             {/* Photo */}
@@ -804,6 +882,8 @@ export function PantryPage() {
                   setNewMasterIngredientId(null);
                   setNewMasterIngredientScope(null);
                   setNewNote("");
+                  setNewExpiresOn("");
+                  setNewIsOpened(false);
                   clearImageSelection();
                   setQuickAddName(null);
                 }}
@@ -939,7 +1019,11 @@ export function PantryPage() {
                                 )
                               }
                               placeholder="Greek name (optional)"
-                              className="flex-1 rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                              className={
+                                editState.masterIngredientId
+                                  ? "flex-1 rounded-lg border border-brand-200 bg-brand-50/30 px-3 py-1.5 text-sm text-stone-900 cursor-default focus:outline-none"
+                                  : "flex-1 rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                              }
                               readOnly={!!editState.masterIngredientId}
                             />
                           </div>
@@ -989,6 +1073,38 @@ export function PantryPage() {
                             }
                             className="w-full rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-700 placeholder:text-stone-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                           />
+
+                          {/* Edit: Expiry & opened */}
+                          <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
+                            <div className="space-y-1">
+                              <span className="text-xs font-medium uppercase tracking-wider text-stone-500">
+                                Expiry date
+                              </span>
+                              <input
+                                type="date"
+                                value={editState.expiresOn}
+                                onChange={(e) =>
+                                  setEditState((s) =>
+                                    s ? { ...s, expiresOn: e.target.value } : s
+                                  )
+                                }
+                                className="w-full max-w-xs rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-700 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                              />
+                            </div>
+                            <label className="flex items-center gap-2 text-sm text-stone-600">
+                              <input
+                                type="checkbox"
+                                checked={editState.isOpened}
+                                onChange={(e) =>
+                                  setEditState((s) =>
+                                    s ? { ...s, isOpened: e.target.checked } : s
+                                  )
+                                }
+                                className="h-4 w-4 rounded border-stone-300 text-brand-600 focus:ring-brand-500"
+                              />
+                              Opened
+                            </label>
+                          </div>
 
                           {/* Edit: Photo */}
                           <div className="space-y-2">
@@ -1148,87 +1264,276 @@ export function PantryPage() {
                             </button>
                           </div>
                         </div>
-                      ) : (
-                        <div
-                          key={item.id}
-                          className="flex items-center justify-between rounded-lg border border-stone-200 bg-white px-4 py-2.5"
-                        >
-                          <div className="flex items-center gap-3 min-w-0">
-                            {item.imageUrl && (
-                              <img
-                                src={item.imageUrl}
-                                alt={item.name}
-                                className="h-9 w-9 rounded-md object-cover border border-stone-200 flex-shrink-0"
-                              />
-                            )}
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-sm text-stone-800">
-                                  {item.name}
-                                </span>
-                                {item.nameSecondary && (
-                                  <span className="text-sm italic text-stone-400">
-                                    ({item.nameSecondary})
-                                  </span>
-                                )}
-                                {item.masterIngredientId && (
-                                  <span className="text-brand-400" title="Linked to catalog">
-                                    <Link2 size={12} />
-                                  </span>
-                                )}
-                                {item.isStaple && (
-                                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">
-                                    Staple
-                                  </span>
-                                )}
-                              </div>
-                              {(item.quantity != null || item.unit) && (
-                                <span className="text-xs text-stone-400 mt-0.5 block">
-                                  {item.quantity}
-                                  {item.unit ? ` ${item.unit}` : ""}
-                                </span>
-                              )}
-                              {item.note && (
-                                <span className="text-xs italic text-stone-400 mt-0.5 block">
-                                  {item.note}
-                                </span>
-                              )}
-                            </div>
-                          </div>
+                      ) : (() => {
+                        const expStatus = getPantryExpiryDisplayStatus(
+                          item.expiresOn
+                        );
+                        const alertMsg = getPantryExpiryAlertMessage(
+                          item.expiresOn
+                        );
+                        const expanded = expandedItemId === item.id;
+                        const headId = `pantry-item-${item.id}-head`;
+                        const panelId = `pantry-item-${item.id}-panel`;
+                        return (
+                          <div
+                            key={item.id}
+                            className={`rounded-lg border ${pantryExpiryCardClasses(
+                              expStatus
+                            )}`}
+                          >
+                            <div className="flex items-start gap-1 px-2 py-2 sm:px-3 sm:py-2.5">
+                              <button
+                                type="button"
+                                id={headId}
+                                aria-expanded={expanded}
+                                aria-controls={panelId}
+                                onClick={() =>
+                                  setExpandedItemId((id) =>
+                                    id === item.id ? null : item.id
+                                  )
+                                }
+                                className="min-w-0 flex-1 text-left rounded-md px-1 py-0.5 hover:bg-stone-900/[0.03] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
+                              >
+                                <div className="flex items-start gap-2">
+                                  {expanded ? (
+                                    <ChevronDown
+                                      size={16}
+                                      className="mt-0.5 flex-shrink-0 text-stone-400"
+                                      aria-hidden
+                                    />
+                                  ) : (
+                                    <ChevronRight
+                                      size={16}
+                                      className="mt-0.5 flex-shrink-0 text-stone-400"
+                                      aria-hidden
+                                    />
+                                  )}
+                                  {item.imageUrl && (
+                                    <img
+                                      src={item.imageUrl}
+                                      alt=""
+                                      className="h-9 w-9 rounded-md object-cover border border-stone-200 flex-shrink-0"
+                                    />
+                                  )}
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <span className="text-sm font-medium text-stone-800">
+                                        {item.name}
+                                      </span>
+                                      {item.nameSecondary && (
+                                        <span className="text-sm italic text-stone-400">
+                                          ({item.nameSecondary})
+                                        </span>
+                                      )}
+                                      {item.masterIngredientId && (
+                                        <span
+                                          className="text-brand-400"
+                                          title="Linked to catalog"
+                                        >
+                                          <Link2 size={12} />
+                                        </span>
+                                      )}
+                                      {item.isStaple && (
+                                        <span
+                                          className="inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700"
+                                          title="Staple"
+                                          aria-label="Staple"
+                                        >
+                                          <Paperclip size={12} strokeWidth={2.25} aria-hidden />
+                                        </span>
+                                      )}
+                                      {item.isOpened && (
+                                        <span
+                                          className="inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-sky-100 text-sky-800"
+                                          title="Opened"
+                                          aria-label="Opened pack"
+                                        >
+                                          <PackageOpen size={12} strokeWidth={2.25} aria-hidden />
+                                        </span>
+                                      )}
+                                    </div>
+                                    {(item.quantity != null || item.unit) && (
+                                      <span className="text-xs text-stone-500 mt-0.5 block">
+                                        {item.quantity}
+                                        {item.unit ? ` ${item.unit}` : ""}
+                                      </span>
+                                    )}
+                                    {item.expiresOn &&
+                                      expStatus === "ok" &&
+                                      !alertMsg && (
+                                        <span className="text-xs text-stone-500 mt-1 flex items-center gap-1">
+                                          <Calendar
+                                            size={12}
+                                            className="flex-shrink-0"
+                                            aria-hidden
+                                          />
+                                          Expires{" "}
+                                          {formatExpiresOnLabel(item.expiresOn)}
+                                        </span>
+                                      )}
+                                    {alertMsg && (
+                                      <span
+                                        className={`text-xs mt-1 flex items-center gap-1 font-medium ${
+                                          expStatus === "expired"
+                                            ? "text-red-700"
+                                            : "text-amber-800"
+                                        }`}
+                                      >
+                                        {expStatus === "expired" ? (
+                                          <AlertTriangle
+                                            size={12}
+                                            className="flex-shrink-0"
+                                            aria-hidden
+                                          />
+                                        ) : (
+                                          <Calendar
+                                            size={12}
+                                            className="flex-shrink-0"
+                                            aria-hidden
+                                          />
+                                        )}
+                                        {alertMsg}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </button>
 
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            <button
-                              onClick={() => startEditing(item)}
-                              className="p-1 text-stone-400 hover:text-brand-600 transition-colors"
-                              title="Edit item"
-                            >
-                              <Pencil size={14} />
-                            </button>
-                            <button
-                              onClick={() => handleToggleStaple(item)}
-                              className={`text-xs px-2 py-1 rounded transition-colors ${
-                                item.isStaple
-                                  ? "text-amber-600 hover:bg-amber-50"
-                                  : "text-stone-400 hover:bg-stone-50"
-                              }`}
-                              title={
-                                item.isStaple
-                                  ? "Remove staple"
-                                  : "Mark as staple"
-                              }
-                            >
-                              {item.isStaple ? "Unstaple" : "Staple"}
-                            </button>
-                            <button
-                              onClick={() => handleDelete(item.id)}
-                              className="p-1 text-stone-400 hover:text-red-500 transition-colors"
-                              aria-label={`Remove ${item.name}`}
-                            >
-                              <Trash2 size={16} />
-                            </button>
+                              <div className="flex items-center gap-0.5 flex-shrink-0 pt-0.5">
+                                <button
+                                  type="button"
+                                  onClick={() => startEditing(item)}
+                                  className="p-1.5 text-stone-400 hover:text-brand-600 transition-colors rounded-md hover:bg-stone-100"
+                                  title="Edit item"
+                                >
+                                  <Pencil size={14} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleStaple(item)}
+                                  className={`text-xs px-2 py-1 rounded transition-colors ${
+                                    item.isStaple
+                                      ? "text-amber-600 hover:bg-amber-50"
+                                      : "text-stone-400 hover:bg-stone-50"
+                                  }`}
+                                  title={
+                                    item.isStaple
+                                      ? "Remove staple"
+                                      : "Mark as staple"
+                                  }
+                                >
+                                  {item.isStaple ? "Unstaple" : "Staple"}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDelete(item.id)}
+                                  className="p-1.5 text-stone-400 hover:text-red-500 transition-colors rounded-md hover:bg-stone-100"
+                                  aria-label={`Remove ${item.name}`}
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            </div>
+
+                            {expanded && (
+                              <div
+                                id={panelId}
+                                role="region"
+                                aria-labelledby={headId}
+                                className="border-t border-stone-200 bg-stone-50/60 px-3 py-3 sm:px-4"
+                              >
+                                <div className="divide-y divide-stone-200/90 text-sm">
+                                  <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 pb-2.5">
+                                    <span className="text-xs font-medium text-stone-500 shrink-0">
+                                      Expiry
+                                    </span>
+                                    <div className="min-w-0 text-right">
+                                      {item.expiresOn ? (
+                                        <>
+                                          <span className="text-stone-900">
+                                            {formatExpiresOnLabel(
+                                              item.expiresOn
+                                            )}
+                                          </span>
+                                          {alertMsg ? (
+                                            <span
+                                              className={`mt-0.5 block text-xs font-medium sm:mt-0 sm:ml-2 sm:inline ${
+                                                expStatus === "expired"
+                                                  ? "text-red-700"
+                                                  : "text-amber-800"
+                                              }`}
+                                            >
+                                              {alertMsg}
+                                            </span>
+                                          ) : null}
+                                        </>
+                                      ) : (
+                                        <span className="text-stone-400">
+                                          Not set
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {item.isOpened ? (
+                                    <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-2.5">
+                                      <span className="text-xs font-medium text-stone-500 shrink-0">
+                                        Opened
+                                      </span>
+                                      <span className="text-stone-900">Yes</span>
+                                    </div>
+                                  ) : null}
+
+                                  {(item.quantity != null || item.unit) && (
+                                    <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-2.5">
+                                      <span className="text-xs font-medium text-stone-500 shrink-0">
+                                        Amount
+                                      </span>
+                                      <span className="text-stone-900 tabular-nums">
+                                        {item.quantity ?? "—"}
+                                        {item.unit ? (
+                                          <span className="text-stone-600">
+                                            {" "}
+                                            {item.unit}
+                                          </span>
+                                        ) : null}
+                                      </span>
+                                    </div>
+                                  )}
+
+                                  {item.note ? (
+                                    <div className="py-2.5">
+                                      <span className="text-xs font-medium text-stone-500">
+                                        Note
+                                      </span>
+                                      <p className="mt-1 text-sm leading-relaxed text-stone-700 whitespace-pre-wrap">
+                                        {item.note}
+                                      </p>
+                                    </div>
+                                  ) : null}
+
+                                  <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 pt-2.5">
+                                    <span className="text-xs font-medium text-stone-500 shrink-0">
+                                      Added
+                                    </span>
+                                    <span className="text-stone-900">
+                                      {item.addedAt.toLocaleDateString(
+                                        undefined,
+                                        {
+                                          weekday: "short",
+                                          year: "numeric",
+                                          month: "short",
+                                          day: "numeric",
+                                        }
+                                      )}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
                           </div>
-                        </div>
-                      )
+                        );
+                      })()
                     )}
                   </div>
                 )}

@@ -102,6 +102,8 @@ export function IngredientsPage() {
       masterIngredientId: item.id,
       masterIngredientScope: masterScopeFromMasterIngredient(item),
       note: "",
+      expiresOn: null,
+      isOpened: false,
     });
     const pk = ingredientLinkKey(item.id, masterScopeFromMasterIngredient(item))!;
     setPantryIds((prev) => new Set(prev).add(pk));

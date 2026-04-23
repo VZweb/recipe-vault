@@ -44,6 +44,8 @@ Deleting a recipe removes linked Storage objects best-effort (`deleteRecipe` + `
 
 Pantry items reference `masterIngredientId` and `masterIngredientScope` when linked to the shared catalog or custom ingredients. Deleting a pantry item removes its `imageUrl` file from Storage when present (dynamic import of `deletePantryImage`).
 
+Optional fields: `expiresOn` — a **calendar date** string in `YYYY-MM-DD` format, or omitted / `null` if unknown; `isOpened` — boolean, `false` by default for legacy documents. The client maps these in `docToPantryItem` in `src/lib/firestore.ts`.
+
 ### Master ingredients
 
 **Catalog** documents live in `ingredientCatalog` (no per-user copy). **Custom** documents live in `users/{uid}/customIngredients`. The client merges both lists for autocomplete; `MasterIngredient.isCatalog` distinguishes them for writes.

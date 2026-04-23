@@ -14,6 +14,10 @@ export interface PantryItem {
   /** `catalog` / `custom` / null (legacy); empty masterIngredientId implies null scope */
   masterIngredientScope: MasterIngredientScope;
   note: string;
+  /** Best-before / expiry calendar date in `YYYY-MM-DD`, or null if not set */
+  expiresOn: string | null;
+  /** User marked the pack as opened (e.g. partial can) */
+  isOpened: boolean;
   addedAt: Date;
 }
 

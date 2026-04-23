@@ -34,6 +34,7 @@ import {
   getUserRecipesCollection,
   getUserTagsCollection,
 } from "./firestorePaths";
+import { parseExpiresOnParts } from "./pantryExpiry";
 
 function toDate(ts: Timestamp | Date | undefined): Date {
   if (ts instanceof Timestamp) return ts.toDate();
@@ -93,6 +94,13 @@ function docToCategory(id: string, data: DocumentData): Category {
   };
 }
 
+function normalizeExpiresOnField(raw: unknown): string | null {
+  if (raw == null || raw === "") return null;
+  if (typeof raw !== "string") return null;
+  const s = raw.trim();
+  return parseExpiresOnParts(s) ? s : null;
+}
+
 function docToPantryItem(id: string, data: DocumentData): PantryItem {
   return {
     id,
@@ -107,6 +115,8 @@ function docToPantryItem(id: string, data: DocumentData): PantryItem {
     masterIngredientId: data.masterIngredientId ?? "",
     masterIngredientScope: normalizeIngredientScope(data.masterIngredientScope),
     note: data.note ?? "",
+    expiresOn: normalizeExpiresOnField(data.expiresOn),
+    isOpened: data.isOpened === true,
     addedAt: toDate(data.addedAt),
   };
 }
@@ -418,7 +428,10 @@ export async function updatePantryItem(
 ): Promise<void> {
   const uid = requireUid();
   const { id: _, ...rest } = data;
-  await updateDoc(doc(getUserPantryCollection(db, uid), id), rest);
+  const payload = Object.fromEntries(
+    Object.entries(rest).filter(([, v]) => v !== undefined)
+  ) as Partial<PantryItem>;
+  await updateDoc(doc(getUserPantryCollection(db, uid), id), payload);
 }
 
 export async function deletePantryItem(id: string): Promise<void> {
