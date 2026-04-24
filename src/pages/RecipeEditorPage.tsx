@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { AlertTriangle, ArrowLeft, ChevronDown, ChevronUp, ClipboardPaste, ImagePlus, LayoutList, Link, Link2, MessageSquare, Plus, Trash2, X } from "lucide-react";
 import { parseIngredientText } from "@/lib/parseIngredients";
@@ -105,6 +105,13 @@ export function RecipeEditorPage() {
   useEffect(() => {
     if (substitutePickerIdx === null) setSubstitutePickerQuery("");
   }, [substitutePickerIdx]);
+
+  /** Scroll to top when the editor replaces the loading state (avoids mid-page viewport). */
+  useLayoutEffect(() => {
+    if (isEditing && id && !loadingRecipe) {
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    }
+  }, [isEditing, id, loadingRecipe]);
 
   useEffect(() => {
     if (recipe && isEditing) {
@@ -800,10 +807,10 @@ export function RecipeEditorPage() {
                   >
                     <input
                       type="text"
+                      data-ingredient-note={idx}
                       placeholder="Note (e.g. diced, melted)"
                       value={ing.note}
                       onChange={(e) => updateIngredient(idx, { note: e.target.value })}
-                      autoFocus
                       className="min-w-0 flex-1 rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-700 placeholder:text-stone-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 sm:min-w-0 sm:flex-1 sm:px-3 sm:py-2"
                     />
                     <button
@@ -962,7 +969,16 @@ export function RecipeEditorPage() {
                     {!noteOpenSet.has(idx) && (
                       <button
                         type="button"
-                        onClick={() => setNoteOpenSet((prev) => new Set(prev).add(idx))}
+                        onClick={() => {
+                          setNoteOpenSet((prev) => new Set(prev).add(idx));
+                          window.setTimeout(() => {
+                            document
+                              .querySelector<HTMLInputElement>(
+                                `input[data-ingredient-note="${idx}"]`
+                              )
+                              ?.focus();
+                          }, 0);
+                        }}
                         className={`rounded-md p-1.5 transition-colors ${
                           ing.note ? "text-brand-500" : "text-stone-400 hover:bg-stone-100 hover:text-stone-600 sm:text-stone-300 sm:hover:bg-transparent sm:hover:text-stone-500"
                         }`}

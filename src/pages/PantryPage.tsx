@@ -1260,7 +1260,7 @@ export function PantryPage() {
                               type="button"
                               onClick={cancelEditing}
                               disabled={saving}
-                              className="rounded-lg px-3 py-1.5 text-xs text-stone-500 hover:bg-stone-100 transition-colors"
+                              className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 shadow-sm hover:bg-stone-50 disabled:opacity-50 transition-colors"
                             >
                               Cancel
                             </button>
@@ -1293,12 +1293,20 @@ export function PantryPage() {
                         const expanded = expandedItemId === item.id;
                         const headId = `pantry-item-${item.id}-head`;
                         const panelId = `pantry-item-${item.id}-panel`;
+                        const hasAmount =
+                          item.quantity != null || Boolean(item.unit?.trim());
+                        const hasExpiry = Boolean(item.expiresOn?.trim());
+                        const hasNote = Boolean(item.note?.trim());
                         return (
                           <div
                             key={item.id}
-                            className={`rounded-lg border ${pantryExpiryCardClasses(
+                            className={`rounded-lg border overflow-hidden transition-[box-shadow,background-color] duration-200 ease-out ${pantryExpiryCardClasses(
                               expStatus
-                            )}`}
+                            )} ${
+                              expanded
+                                ? "shadow-md ring-1 ring-stone-200/70"
+                                : "shadow-sm"
+                            }`}
                           >
                             <div className="flex items-start gap-1 px-2 py-2 sm:px-3 sm:py-2.5">
                               <button
@@ -1311,7 +1319,7 @@ export function PantryPage() {
                                     id === item.id ? null : item.id
                                   )
                                 }
-                                className="min-w-0 flex-1 text-left rounded-md px-1 py-0.5 hover:bg-stone-900/[0.03] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
+                                className="min-w-0 flex-1 text-left rounded-lg px-1.5 py-1 -mx-0.5 -my-0.5 hover:bg-stone-900/[0.04] active:bg-stone-900/[0.08] active:scale-[0.995] transition-[background-color,transform,box-shadow] duration-150 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
                               >
                                 <div className="flex items-start gap-2">
                                   {expanded ? (
@@ -1334,7 +1342,7 @@ export function PantryPage() {
                                       className="h-9 w-9 rounded-md object-cover border border-stone-200 flex-shrink-0"
                                     />
                                   )}
-                                  <div className="min-w-0 flex-1 flex flex-col">
+                                  <div className="min-w-0 flex-1 flex flex-col gap-1">
                                     <div className="flex items-center gap-2 flex-wrap">
                                       <span className="text-sm font-medium text-stone-800">
                                         {item.name}
@@ -1354,15 +1362,9 @@ export function PantryPage() {
                                         </span>
                                       )}
                                     </div>
-                                    {(item.quantity != null || item.unit) && (
-                                      <span className="text-xs text-stone-500 mt-0.5 block">
-                                        {item.quantity}
-                                        {item.unit ? ` ${item.unit}` : ""}
-                                      </span>
-                                    )}
-                                    {alertMsg && (
+                                    {hasExpiry && alertMsg ? (
                                       <span
-                                        className={`text-xs mt-1 flex items-center gap-1 font-medium ${
+                                        className={`text-xs flex items-center gap-1 font-medium ${
                                           expStatus === "expired"
                                             ? "text-red-700"
                                             : "text-amber-800"
@@ -1383,7 +1385,22 @@ export function PantryPage() {
                                         )}
                                         {alertMsg}
                                       </span>
-                                    )}
+                                    ) : hasExpiry ? (
+                                      <span className="text-xs flex items-center gap-1 text-stone-500">
+                                        <Calendar
+                                          size={12}
+                                          className="flex-shrink-0"
+                                          aria-hidden
+                                        />
+                                        {formatExpiresOnLabel(item.expiresOn!)}
+                                      </span>
+                                    ) : null}
+                                    {hasAmount ? (
+                                      <span className="text-xs text-stone-500 block tabular-nums">
+                                        {item.quantity ?? ""}
+                                        {item.unit ? ` ${item.unit}` : ""}
+                                      </span>
+                                    ) : null}
                                   </div>
                                 </div>
                               </button>
@@ -1439,7 +1456,7 @@ export function PantryPage() {
                                     ) : null}
                                     {item.expiresOn ? (
                                       <span
-                                        className="inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-stone-100 text-stone-600"
+                                        className="inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-stone-300 text-stone-800"
                                         title="Expiry date set"
                                         aria-label="Has expiry date"
                                       >
@@ -1455,102 +1472,100 @@ export function PantryPage() {
                               </div>
                             </div>
 
-                            {expanded && (
-                              <div
-                                id={panelId}
-                                role="region"
-                                aria-labelledby={headId}
-                                className="border-t border-stone-200 bg-stone-50/60 px-3 py-3 sm:px-4"
-                              >
-                                <div className="divide-y divide-stone-200/90 text-sm">
-                                  <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 pb-2.5">
-                                    <span className="text-xs font-medium text-stone-500 shrink-0">
-                                      Expiry
-                                    </span>
-                                    <div className="min-w-0 text-right">
-                                      {item.expiresOn ? (
-                                        <>
+                            <div
+                              className={`grid transition-[grid-template-rows] duration-200 ease-out ${
+                                expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+                              }`}
+                            >
+                              <div className="min-h-0 overflow-hidden">
+                                <div
+                                  id={panelId}
+                                  role="region"
+                                  aria-labelledby={headId}
+                                  aria-hidden={!expanded}
+                                  className="border-t border-stone-100 bg-stone-50/70 px-4 py-4 sm:px-5 text-sm"
+                                >
+                                  <div className="flex flex-col gap-0">
+                                    {hasExpiry ? (
+                                      <div className="flex flex-wrap items-start justify-between gap-x-5 gap-y-1.5 border-b border-stone-100/90 pb-3.5">
+                                        <span className="text-xs font-medium uppercase tracking-wide text-stone-400 shrink-0 pt-0.5">
+                                          Expiry
+                                        </span>
+                                        <div className="min-w-0 text-right">
                                           <span className="text-stone-900">
                                             {formatExpiresOnLabel(
-                                              item.expiresOn
+                                              item.expiresOn!
                                             )}
                                           </span>
-                                          {alertMsg ? (
-                                            <span
-                                              className={`mt-0.5 block text-xs font-medium sm:mt-0 sm:ml-2 sm:inline ${
-                                                expStatus === "expired"
-                                                  ? "text-red-700"
-                                                  : "text-amber-800"
-                                              }`}
-                                            >
-                                              {alertMsg}
+                                        </div>
+                                      </div>
+                                    ) : null}
+
+                                    {hasAmount ? (
+                                      <div className="flex flex-wrap items-baseline justify-between gap-x-5 gap-y-1 border-b border-stone-100/90 py-3.5">
+                                        <span className="text-xs font-medium uppercase tracking-wide text-stone-400 shrink-0">
+                                          Amount
+                                        </span>
+                                        <span className="text-stone-900 tabular-nums text-right">
+                                          {item.quantity ?? "—"}
+                                          {item.unit ? (
+                                            <span className="text-stone-600">
+                                              {" "}
+                                              {item.unit}
                                             </span>
                                           ) : null}
-                                        </>
-                                      ) : (
-                                        <span className="text-stone-400">
-                                          Not set
                                         </span>
-                                      )}
-                                    </div>
-                                  </div>
+                                      </div>
+                                    ) : null}
 
-                                  {item.isOpened ? (
-                                    <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-2.5">
-                                      <span className="text-xs font-medium text-stone-500 shrink-0">
-                                        Opened
-                                      </span>
-                                      <span className="text-stone-900">Yes</span>
-                                    </div>
-                                  ) : null}
+                                    {item.isOpened ? (
+                                      <div className="flex flex-wrap items-baseline justify-between gap-x-5 gap-y-1 border-b border-stone-100/90 py-3.5">
+                                        <span className="text-xs font-medium uppercase tracking-wide text-stone-400 shrink-0">
+                                          Opened
+                                        </span>
+                                        <span className="text-stone-900">
+                                          Yes
+                                        </span>
+                                      </div>
+                                    ) : null}
 
-                                  {(item.quantity != null || item.unit) && (
-                                    <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-2.5">
-                                      <span className="text-xs font-medium text-stone-500 shrink-0">
-                                        Amount
+                                    <div
+                                      className={`flex flex-wrap items-baseline justify-between gap-x-5 gap-y-1 py-3.5 ${
+                                        hasNote
+                                          ? "border-b border-stone-100/90"
+                                          : ""
+                                      }`}
+                                    >
+                                      <span className="text-xs font-medium uppercase tracking-wide text-stone-400 shrink-0">
+                                        Date added
                                       </span>
-                                      <span className="text-stone-900 tabular-nums">
-                                        {item.quantity ?? "—"}
-                                        {item.unit ? (
-                                          <span className="text-stone-600">
-                                            {" "}
-                                            {item.unit}
-                                          </span>
-                                        ) : null}
+                                      <span className="text-stone-900 text-right">
+                                        {item.addedAt.toLocaleDateString(
+                                          undefined,
+                                          {
+                                            weekday: "short",
+                                            year: "numeric",
+                                            month: "short",
+                                            day: "numeric",
+                                          }
+                                        )}
                                       </span>
                                     </div>
-                                  )}
 
-                                  {item.note ? (
-                                    <div className="py-2.5">
-                                      <span className="text-xs font-medium text-stone-500">
-                                        Note
-                                      </span>
-                                      <p className="mt-1 text-sm leading-relaxed text-stone-700 whitespace-pre-wrap">
-                                        {item.note}
-                                      </p>
-                                    </div>
-                                  ) : null}
-
-                                  <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 pt-2.5">
-                                    <span className="text-xs font-medium text-stone-500 shrink-0">
-                                      Added
-                                    </span>
-                                    <span className="text-stone-900">
-                                      {item.addedAt.toLocaleDateString(
-                                        undefined,
-                                        {
-                                          weekday: "short",
-                                          year: "numeric",
-                                          month: "short",
-                                          day: "numeric",
-                                        }
-                                      )}
-                                    </span>
+                                    {hasNote ? (
+                                      <div className="pt-1">
+                                        <span className="text-xs font-medium uppercase tracking-wide text-stone-400">
+                                          Note
+                                        </span>
+                                        <p className="mt-2 text-sm leading-relaxed text-stone-700 whitespace-pre-wrap">
+                                          {item.note}
+                                        </p>
+                                      </div>
+                                    ) : null}
                                   </div>
                                 </div>
                               </div>
-                            )}
+                            </div>
                           </div>
                         );
                       })()

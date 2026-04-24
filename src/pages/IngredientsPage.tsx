@@ -627,7 +627,7 @@ export function IngredientsPage() {
                             <button
                               onClick={cancelEditing}
                               disabled={saving}
-                              className="rounded-lg px-3 py-1.5 text-xs text-stone-500 hover:bg-stone-100 transition-colors"
+                              className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 shadow-sm hover:bg-stone-50 disabled:opacity-50 transition-colors"
                             >
                               Cancel
                             </button>
