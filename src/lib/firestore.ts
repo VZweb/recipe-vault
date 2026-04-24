@@ -18,7 +18,7 @@ import {
 } from "firebase/firestore";
 import { DEFAULT_CATEGORIES, DEFAULT_TAGS } from "@/data/defaultVaultTemplates";
 import { db, refreshAuthIdToken, requireUid } from "./firebase";
-import { deleteRecipeImage } from "./storage";
+import { deleteRecipeImage, deletePantryImage } from "./storage";
 import type { MasterIngredientScope } from "@/types/ingredientRef";
 import type { Recipe, RecipeFormData } from "@/types/recipe";
 import type { Tag } from "@/types/tag";
@@ -455,6 +455,35 @@ export async function updatePantryItem(
   await updateDoc(doc(getUserPantryCollection(db, uid), id), payload);
 }
 
+/**
+ * Restock / new purchase: keeps identity (name, catalog link, category, staple flag),
+ * clears quantity, unit, note, expiry, opened flag and image, sets `addedAt` to now.
+ * Removes the previous Storage image after the document update succeeds.
+ */
+export async function refreshPantryItem(id: string): Promise<void> {
+  const uid = requireUid();
+  const ref = doc(getUserPantryCollection(db, uid), id);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return;
+  const rawUrl = snap.data().imageUrl;
+  const prevImage =
+    typeof rawUrl === "string" && rawUrl.trim() ? rawUrl.trim() : null;
+
+  await updateDoc(ref, {
+    quantity: null,
+    unit: null,
+    note: "",
+    expiresOn: null,
+    isOpened: false,
+    imageUrl: null,
+    addedAt: Timestamp.now(),
+  });
+
+  if (prevImage) {
+    await deletePantryImage(prevImage);
+  }
+}
+
 export async function deletePantryItem(id: string): Promise<void> {
   const uid = requireUid();
   const pantryRef = getUserPantryCollection(db, uid);
@@ -462,7 +491,6 @@ export async function deletePantryItem(id: string): Promise<void> {
   const imageUrl = snap.exists() ? snap.data().imageUrl : null;
   await deleteDoc(doc(pantryRef, id));
   if (imageUrl) {
-    const { deletePantryImage } = await import("./storage");
     await deletePantryImage(imageUrl);
   }
 }

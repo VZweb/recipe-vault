@@ -16,6 +16,7 @@ import {
   Paperclip,
   Pencil,
   Plus,
+  RefreshCw,
   Search,
   Trash2,
   X,
@@ -26,6 +27,7 @@ import {
   addPantryItem,
   updatePantryItem,
   deletePantryItem,
+  refreshPantryItem,
 } from "@/lib/firestore";
 import { uploadPantryImage, deletePantryImage } from "@/lib/storage";
 import { useAuth } from "@/contexts/AuthContext";
@@ -116,6 +118,13 @@ export function PantryPage() {
   const [clearing, setClearing] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
+  const [refreshingItemId, setRefreshingItemId] = useState<string | null>(null);
+  const [pantryItemToDelete, setPantryItemToDelete] = useState<PantryItem | null>(
+    null
+  );
+  const [pantryItemToRefresh, setPantryItemToRefresh] = useState<PantryItem | null>(
+    null
+  );
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -267,6 +276,34 @@ export function PantryPage() {
   const handleDelete = async (id: string) => {
     await deletePantryItem(id);
     setItems((prev) => prev.filter((i) => i.id !== id));
+  };
+
+  const handleRefreshPantryItem = async (item: PantryItem) => {
+    setRefreshingItemId(item.id);
+    try {
+      await refreshPantryItem(item.id);
+      const now = new Date();
+      setItems((prev) =>
+        prev.map((i) =>
+          i.id === item.id
+            ? {
+                ...i,
+                quantity: null,
+                unit: null,
+                note: "",
+                expiresOn: null,
+                isOpened: false,
+                imageUrl: null,
+                addedAt: now,
+              }
+            : i
+        )
+      );
+      if (editingItemId === item.id) cancelEditing();
+      setExpandedItemId((id) => (id === item.id ? null : id));
+    } finally {
+      setRefreshingItemId(null);
+    }
   };
 
   const handleClearNonStaples = async () => {
@@ -1401,15 +1438,31 @@ export function PantryPage() {
                                   <button
                                     type="button"
                                     onClick={() => startEditing(item)}
-                                    className="p-1.5 text-stone-400 hover:text-brand-600 transition-colors rounded-md hover:bg-stone-100"
+                                    disabled={refreshingItemId === item.id}
+                                    className="p-1.5 text-stone-400 hover:text-brand-600 transition-colors rounded-md hover:bg-stone-100 disabled:pointer-events-none disabled:opacity-40"
                                     title="Edit item"
                                   >
                                     <Pencil size={14} />
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={() => handleDelete(item.id)}
-                                    className="p-1.5 text-stone-400 hover:text-red-500 transition-colors rounded-md hover:bg-stone-100"
+                                    onClick={() => setPantryItemToRefresh(item)}
+                                    disabled={refreshingItemId === item.id}
+                                    className="p-1.5 text-stone-400 hover:text-emerald-600 transition-colors rounded-md hover:bg-stone-100 disabled:pointer-events-none disabled:opacity-40"
+                                    title="Restock — clear amount, note, expiry, opened, and photo; date added becomes today"
+                                    aria-label={`Restock ${item.name}`}
+                                  >
+                                    {refreshingItemId === item.id ? (
+                                      <Spinner className="h-3.5 w-3.5" />
+                                    ) : (
+                                      <RefreshCw size={14} />
+                                    )}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setPantryItemToDelete(item)}
+                                    disabled={refreshingItemId === item.id}
+                                    className="p-1.5 text-stone-400 hover:text-red-500 transition-colors rounded-md hover:bg-stone-100 disabled:pointer-events-none disabled:opacity-40"
                                     aria-label={`Remove ${item.name}`}
                                   >
                                     <Trash2 size={16} />
@@ -1640,6 +1693,44 @@ export function PantryPage() {
         variant="danger"
         onConfirm={handleClearEverything}
         onCancel={() => setClearEverythingConfirm(false)}
+      />
+
+      <ConfirmDialog
+        open={!!pantryItemToDelete}
+        title="Remove from pantry"
+        message={
+          pantryItemToDelete
+            ? `Remove “${pantryItemToDelete.name}” from your pantry? This cannot be undone.`
+            : ""
+        }
+        confirmLabel="Remove"
+        variant="danger"
+        onConfirm={async () => {
+          if (!pantryItemToDelete) return;
+          const id = pantryItemToDelete.id;
+          setPantryItemToDelete(null);
+          await handleDelete(id);
+        }}
+        onCancel={() => setPantryItemToDelete(null)}
+      />
+
+      <ConfirmDialog
+        open={!!pantryItemToRefresh}
+        title="Restock item"
+        message={
+          pantryItemToRefresh
+            ? `Reset “${pantryItemToRefresh.name}” for a new purchase? Amount, unit, note, expiry, opened flag, and photo will be cleared, and date added will be set to today.`
+            : ""
+        }
+        confirmLabel="Restock"
+        variant="primary"
+        onConfirm={async () => {
+          if (!pantryItemToRefresh) return;
+          const item = pantryItemToRefresh;
+          setPantryItemToRefresh(null);
+          await handleRefreshPantryItem(item);
+        }}
+        onCancel={() => setPantryItemToRefresh(null)}
       />
     </div>
   );
