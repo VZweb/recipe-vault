@@ -423,6 +423,32 @@ export function RecipeDetailPage() {
                           </span>
                         )}
                       </div>
+                      {ing.substituteLinks && ing.substituteLinks.length > 0 && (
+                        <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                          <span className="text-[11px] font-medium uppercase tracking-wide text-stone-400">
+                            or
+                          </span>
+                          {ing.substituteLinks.map((sub, si) => {
+                            const mi = resolveMasterIngredient(
+                              sub.masterIngredientId,
+                              sub.masterIngredientScope,
+                              masterIngredients
+                            );
+                            return (
+                              <span
+                                key={`${sub.masterIngredientId}-${si}`}
+                                className="inline-flex max-w-full items-center gap-0.5 rounded-md border border-stone-200/80 bg-stone-50 px-1.5 py-0.5 text-xs text-stone-600 [overflow-wrap:anywhere]"
+                                title="Alternative for pantry matching"
+                              >
+                                <Link2 size={10} className="shrink-0 text-brand-400" aria-hidden />
+                                <span className="min-w-0 break-words">
+                                  {mi?.name ?? sub.masterIngredientId}
+                                </span>
+                              </span>
+                            );
+                          })}
+                        </div>
+                      )}
                       {ing.note && (
                         <p className="mt-0.5 text-xs text-stone-400 italic leading-snug break-words [overflow-wrap:anywhere]">
                           {ing.note}

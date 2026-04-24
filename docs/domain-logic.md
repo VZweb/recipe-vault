@@ -21,6 +21,17 @@ If search behavior or fields change, update this doc and any UX copy that refers
 
 Pantry and recipe ingredients must stay linked to master ingredients for meaningful results. On **Suggestions**, “extra ingredients” are attributed to a recipe when any of the line’s keys (primary or substitute) matches the extra’s link key.
 
+## Recipe ingredient alternatives (substituteLinks)
+
+Recipe lines can list **extra** linked masters that count as the same “slot” for pantry matching and suggestions. This is **recipe-scoped**: catalog and pantry still store each master (e.g. chicken breast vs wings) as separate documents; `substituteLinks` only declares that either key satisfies **this** line.
+
+- **Shape:** On each non-section ingredient, optional **`substituteLinks`**: `{ masterIngredientId, masterIngredientScope }[]` (same scope rules as the primary link: `catalog` | `custom` | legacy `null`). Missing or legacy docs normalize to `[]` in [`docToRecipe`](../src/lib/firestore.ts).
+- **Keys:** [`ingredientLineLinkKeys`](../src/lib/ingredientRef.ts) returns deduped pantry link keys for the primary plus every substitute. Consumers include [`suggestRecipes`](../src/lib/suggestions.ts), pantry checks on [`RecipeDetailPage`](../src/pages/RecipeDetailPage.tsx) (row highlight and “X / Y in pantry” count), and extra-ingredient attribution on [`SuggestionsPage`](../src/pages/SuggestionsPage.tsx).
+- **Editor:** [`RecipeEditorPage`](../src/pages/RecipeEditorPage.tsx) — inside each ingredient card, above the reorder row: **Add alternative** opens catalog autocomplete (query state is local so typing works); chosen items appear as chips with remove. Choosing a new primary drops any substitute that duplicates that link.
+- **Recipe detail:** [`RecipeDetailPage`](../src/pages/RecipeDetailPage.tsx) — when `substituteLinks` is non-empty, an **or** row under the line name lists resolved alternative names (small chips + catalog link icon). If the line is in pantry only via a substitute, the package icon tooltip names the matching alternative.
+- **Search:** `buildSearchIndex` includes substitute masters’ names, Greek labels, and aliases in `ingredientNames` (see [Client-side search](#client-side-search-searchts) above).
+- **Defaults:** [`parseIngredientText`](../src/lib/parseIngredients.ts) and URL import ([`importRecipeFromUrl`](../functions/src/importRecipeFromUrl.ts) / client mapping in [`importRecipeFromUrlClient`](../src/lib/importRecipeFromUrlClient.ts)) set `substituteLinks: []`; alternatives are added in the editor.
+
 ## Pantry expiry and opened UX
 
 Implemented in [`src/lib/pantryExpiry.ts`](../src/lib/pantryExpiry.ts) and consumed by [`PantryPage`](../src/pages/PantryPage.tsx).
@@ -40,7 +51,7 @@ Changing warning behavior or date semantics should start in `pantryExpiry.ts`, t
 
 ## Parsing helpers
 
-- `parseIngredients.ts` — splits pasted ingredient text into structured lines (used by the recipe editor flow).
+- `parseIngredients.ts` — splits pasted ingredient text into structured lines (used by the recipe editor flow). Each line includes `substituteLinks: []`; users add alternatives after paste in the editor.
 - `parseSteps.ts` — splits pasted step text into ordered steps.
 
 When input formats or output shapes change, update this section and any user-facing hints in the editor.

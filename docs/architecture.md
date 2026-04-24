@@ -28,6 +28,8 @@ Routes live in `src/App.tsx`. Unauthenticated visitors are redirected to **`/log
 | `/ingredients` | `IngredientsPage` | Master ingredients catalog |
 | `/suggestions` | `SuggestionsPage` | “What can I cook?” |
 
+**Recipe ingredient alternatives:** Optional per-line **`substituteLinks`** (extra catalog/custom masters that OR-match pantry and suggestions) are edited in **`RecipeEditorPage`** and listed read-only on **`RecipeDetailPage`**. See [Domain logic — Recipe ingredient alternatives (substituteLinks)](./domain-logic.md#recipe-ingredient-alternatives-substitutelinks).
+
 ## Layout and navigation
 
 `AppLayout` provides:

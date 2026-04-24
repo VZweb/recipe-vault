@@ -33,6 +33,8 @@ Path helpers live in `src/lib/firestorePaths.ts`; reads/writes are implemented i
 
 Recipes store arrays of ingredient lines (with optional `masterIngredientId` + `masterIngredientScope`: `catalog` | `custom` | null for legacy, plus optional **`substituteLinks`**: array of `{ masterIngredientId, masterIngredientScope }` for other masters that satisfy the same line for pantry matching and suggestions), steps, optional `categoryId`, `tags` (array of tag document IDs), `imageUrls`, timestamps (`createdAt`, `updatedAt`), and `cookedCount`. `docToRecipe` normalizes missing fields when reading (including default `substituteLinks: []`). The recipe list’s **multi-tag filter** is **AND**: `fetchRecipes` uses `array-contains` on the first tag id, then filters the rest in memory.
 
+**Alternatives UX:** Users edit `substituteLinks` in [`RecipeEditorPage`](../src/pages/RecipeEditorPage.tsx) (inside each ingredient card). [`RecipeDetailPage`](../src/pages/RecipeDetailPage.tsx) shows linked alternatives read-only under the line name. Behavior and matching rules are described in [Domain logic — Recipe ingredient alternatives (substituteLinks)](./domain-logic.md#recipe-ingredient-alternatives-substitutelinks).
+
 Deleting a recipe removes linked Storage objects best-effort (`deleteRecipe` + `deleteRecipeImage`).
 
 ### Tags and categories

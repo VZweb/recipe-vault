@@ -80,14 +80,14 @@ Detailed docs live under [`docs/`](./docs/README.md):
 
 - [Architecture](./docs/architecture.md) — routing, layout, how layers connect
 - [Data and Firebase](./docs/data-and-firebase.md) — collections, Storage paths, indexes
-- [Domain logic](./docs/domain-logic.md) — search, suggestions, parsing, normalization
+- [Domain logic](./docs/domain-logic.md) — search, suggestions, ingredient alternatives, parsing, normalization
 - [PWA and offline](./docs/pwa-and-offline.md) — manifest and service worker
 - [Operations](./docs/operations.md) — env vars, scripts, deploy
 - [Security](./docs/security.md) — Firestore and Storage rules, hardening notes
 
 ## Features
 
-- Recipe CRUD with ingredients, steps, and photos
+- Recipe CRUD with ingredients, steps, and photos (optional **ingredient alternatives** per line for pantry / “what can I cook?” OR matching)
 - Tag-based organization and filtering
 - Full-text search across recipes
 - Pantry management (track what you have at home)
