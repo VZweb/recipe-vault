@@ -50,6 +50,8 @@ import {
   type PantryExpiryDisplayStatus,
 } from "@/lib/pantryExpiry";
 
+type PantryListQuickFilter = "expired" | "expiringSoon" | "staples";
+
 function pantryExpiryCardClasses(status: PantryExpiryDisplayStatus): string {
   switch (status) {
     case "expired":
@@ -102,6 +104,8 @@ export function PantryPage() {
   const [newIsOpened, setNewIsOpened] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [listQuickFilter, setListQuickFilter] =
+    useState<PantryListQuickFilter | null>(null);
   const [quickAddName, setQuickAddName] = useState<string | null>(null);
   const { ingredients: masterIngredients, add: addCatalogIngredient } = useIngredients();
 
@@ -522,9 +526,24 @@ export function PantryPage() {
     });
   }, [items, searchQuery, aliasMap]);
 
+  const displayItems = useMemo(() => {
+    if (listQuickFilter === null) return filteredItems;
+    if (listQuickFilter === "staples") {
+      return filteredItems.filter((i) => i.isStaple);
+    }
+    if (listQuickFilter === "expired") {
+      return filteredItems.filter(
+        (i) => getPantryExpiryDisplayStatus(i.expiresOn) === "expired"
+      );
+    }
+    return filteredItems.filter(
+      (i) => getPantryExpiryDisplayStatus(i.expiresOn) === "expiringSoon"
+    );
+  }, [filteredItems, listQuickFilter]);
+
   const grouped = PANTRY_CATEGORIES.reduce(
     (acc, cat) => {
-      const catItems = filteredItems.filter((i) => i.category === cat);
+      const catItems = displayItems.filter((i) => i.category === cat);
       if (catItems.length > 0) acc[cat] = catItems;
       return acc;
     },
@@ -566,6 +585,44 @@ export function PantryPage() {
                 <X size={14} />
               </button>
             )}
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            {(
+              [
+                {
+                  id: "expired" as const,
+                  label: "Expired",
+                  icon: AlertTriangle,
+                },
+                {
+                  id: "expiringSoon" as const,
+                  label: "Expiring soon",
+                  icon: Calendar,
+                },
+                { id: "staples" as const, label: "Staples", icon: Paperclip },
+              ] as const
+            ).map(({ id, label, icon: Icon }) => {
+              const active = listQuickFilter === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() =>
+                    setListQuickFilter((cur) => (cur === id ? null : id))
+                  }
+                  className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                    active
+                      ? "border-brand-500 bg-brand-600 text-white shadow-sm"
+                      : "border-stone-200 bg-white/80 text-stone-600 hover:border-stone-300 hover:bg-white"
+                  }`}
+                >
+                  <Icon size={14} className={active ? "opacity-95" : "opacity-70"} />
+                  {label}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
@@ -1644,17 +1701,55 @@ export function PantryPage() {
             </button>
           </div>
         </div>
-      ) : searchQuery.trim() ? (
+      ) : items.length === 0 ? (
+        <EmptyState
+          icon={<Package size={48} />}
+          title="Pantry is empty"
+          description="Add items you have at home. Mark staples like salt and oil so they're always counted."
+        />
+      ) : filteredItems.length === 0 && searchQuery.trim() ? (
         <EmptyState
           icon={<Search size={48} />}
           title="No matches"
           description={`No pantry items match "${searchQuery}".`}
         />
+      ) : displayItems.length === 0 && listQuickFilter !== null ? (
+        <EmptyState
+          icon={
+            listQuickFilter === "expired" ? (
+              <AlertTriangle size={48} />
+            ) : listQuickFilter === "expiringSoon" ? (
+              <Calendar size={48} />
+            ) : (
+              <Paperclip size={48} />
+            )
+          }
+          title={
+            listQuickFilter === "expired"
+              ? "Nothing expired"
+              : listQuickFilter === "expiringSoon"
+                ? "Nothing expiring soon"
+                : "No staples in this view"
+          }
+          description={
+            listQuickFilter === "expired"
+              ? searchQuery.trim()
+                ? "No matching items are past their expiry. Try another filter or clear the search."
+                : "No items are past their expiry date."
+              : listQuickFilter === "expiringSoon"
+                ? searchQuery.trim()
+                  ? "No matching items expire within the next week. Try another filter or clear the search."
+                  : "No items expire within the next week. Items without a date set won't appear here."
+                : searchQuery.trim()
+                  ? "No matching items are marked as staples. Try another filter or clear the search."
+                  : "Mark pantry items as staples when you add or edit them so they show up here."
+          }
+        />
       ) : (
         <EmptyState
           icon={<Package size={48} />}
-          title="Pantry is empty"
-          description="Add items you have at home. Mark staples like salt and oil so they're always counted."
+          title="Nothing to show"
+          description="Try adjusting your search or filters."
         />
       )}
 
