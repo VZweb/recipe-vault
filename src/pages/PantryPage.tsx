@@ -1385,15 +1385,6 @@ export function PantryPage() {
                                         )}
                                         {alertMsg}
                                       </span>
-                                    ) : hasExpiry ? (
-                                      <span className="text-xs flex items-center gap-1 text-stone-500">
-                                        <Calendar
-                                          size={12}
-                                          className="flex-shrink-0"
-                                          aria-hidden
-                                        />
-                                        {formatExpiresOnLabel(item.expiresOn!)}
-                                      </span>
                                     ) : null}
                                     {hasAmount ? (
                                       <span className="text-xs text-stone-500 block tabular-nums">
