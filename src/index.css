@@ -16,3 +16,25 @@
   --color-brand-800: #166534;
   --color-brand-900: #14532d;
 }
+
+/* Cook pantry wizard: subtle transition between ingredient steps */
+@keyframes cook-pantry-step-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.cook-pantry-step-animate {
+  animation: cook-pantry-step-in 0.28s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cook-pantry-step-animate {
+    animation: none;
+  }
+}

@@ -45,6 +45,16 @@ Implemented in [`src/lib/pantryExpiry.ts`](../src/lib/pantryExpiry.ts) and consu
 
 Changing warning behavior or date semantics should start in `pantryExpiry.ts`, then align [`PantryPage`](../src/pages/PantryPage.tsx) and this doc.
 
+## After cooking: pantry wizard (`pantryRecipeMatch.ts` + `CookPantryWizardDialog`)
+
+When the user records a cook from [`RecipeDetailPage`](../src/pages/RecipeDetailPage.tsx), a dialog can walk **pantry rows that match** the recipe’s non-section ingredients (same link-key rules as elsewhere: [`ingredientLineLinkKeys`](../src/lib/ingredientRef.ts), primary vs `substituteLinks`). The queue is built in [`buildCookPantryQueue`](../src/lib/pantryRecipeMatch.ts) and **dedupes by pantry document id** so one pack is not offered twice if two lines resolve to it.
+
+- **Empty queue:** Nothing matched → user can still **Count this cook** without pantry writes.
+- **Non-empty:** First screen is the first pantry item; **Skip pantry — just count this cook** increments only (same callback as finish paths). Per row: **Save & next** (writes `quantity` / `unit` / `isOpened`), **Skip this item** (no write), **Remove from pantry** (with an extra confirm when the row is a **staple**). After the last row, a **Done — count this cook** step fires the same increment as the other success paths.
+- **Reusable UI:** [`CookPantryWizardDialog`](../src/components/CookPantryWizardDialog.tsx) is prop-driven (`recipe`, `pantryItems`, `open`, `onOpenChange`, `onCountedCook`) so another control can open the same flow later.
+
+If matching or dedupe rules change, update `pantryRecipeMatch.ts` and this section.
+
 ## Normalization (`normalize.ts`)
 
 `normalizeText` supports **Greek-aware** matching: lowercases, trims, NFD accent stripping, folds final sigma (ς → σ), collapses whitespace. Used where ingredient or name matching must be tolerant of spelling variants.

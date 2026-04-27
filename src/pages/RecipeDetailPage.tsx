@@ -28,6 +28,8 @@ import { TagChip } from "@/components/ui/TagChip";
 import { CategoryIcon } from "@/components/ui/CategoryIcon";
 import { Spinner } from "@/components/ui/Spinner";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { CookPantryWizardDialog } from "@/components/CookPantryWizardDialog";
+import type { CookCountedReason } from "@/components/CookPantryWizardDialog";
 import type { PantryItem } from "@/types/pantry";
 import type { Ingredient } from "@/types/recipe";
 import { useIngredients } from "@/hooks/useIngredients";
@@ -46,6 +48,7 @@ export function RecipeDetailPage() {
   const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
   const [checkedSteps, setCheckedSteps] = useState<Set<number>>(new Set());
   const [checkedIngredients, setCheckedIngredients] = useState<Set<number>>(new Set());
+  const [cookWizardOpen, setCookWizardOpen] = useState(false);
 
   const loadPantry = useCallback(async () => {
     const items = await fetchPantryItems();
@@ -60,10 +63,11 @@ export function RecipeDetailPage() {
     if (recipe) setCookedCount(recipe.cookedCount);
   }, [recipe]);
 
-  const handleMarkCooked = async () => {
+  const handleCountedCook = async (_reason: CookCountedReason) => {
     if (!recipe) return;
     setCookedCount((c) => c + 1);
     await incrementCooked(recipe.id);
+    await loadPantry();
   };
 
   const pantryLinkKeys = useMemo(
@@ -170,7 +174,7 @@ export function RecipeDetailPage() {
           Back to recipes
         </Link>
         <div className="flex items-center gap-2">
-          <Button variant="secondary" size="sm" onClick={handleMarkCooked}>
+          <Button variant="secondary" size="sm" onClick={() => setCookWizardOpen(true)}>
             <ChefHat size={16} />
             <span className="hidden sm:inline">I made this!</span>
             <span className="inline-flex items-center justify-center rounded-full bg-brand-100 text-brand-700 text-xs font-semibold min-w-[1.25rem] h-5 px-1">
@@ -538,6 +542,15 @@ export function RecipeDetailPage() {
       </div>
 
       {/* Delete dialog */}
+      <CookPantryWizardDialog
+        recipe={recipe}
+        pantryItems={pantryItems}
+        masterIngredients={masterIngredients}
+        open={cookWizardOpen}
+        onOpenChange={setCookWizardOpen}
+        onCountedCook={handleCountedCook}
+      />
+
       <ConfirmDialog
         open={deleteOpen}
         title="Delete recipe"
