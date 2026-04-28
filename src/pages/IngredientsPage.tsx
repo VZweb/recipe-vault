@@ -703,7 +703,8 @@ export function IngredientsPage() {
                                 navigateToSuggestionsForIngredient(
                                   navigate,
                                   item.id,
-                                  masterScopeFromMasterIngredient(item)
+                                  masterScopeFromMasterIngredient(item),
+                                  { forceAsExtra: true }
                                 )
                               }
                               className="p-1 text-stone-400 hover:text-amber-600 transition-colors rounded-md hover:bg-stone-100"

@@ -616,7 +616,7 @@ export function PantryPage() {
                   onClick={() =>
                     setListQuickFilter((cur) => (cur === id ? null : id))
                   }
-                  className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                  className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
                     active
                       ? "border-brand-500 bg-brand-600 text-white shadow-sm"
                       : "border-stone-200 bg-white/80 text-stone-600 hover:border-stone-300 hover:bg-white"
@@ -1067,7 +1067,7 @@ export function PantryPage() {
                                 <input
                                   value={editState.name}
                                   readOnly
-                                  className="flex-1 rounded-lg border border-brand-200 bg-brand-50/30 px-3 py-1.5 text-sm text-stone-900 cursor-default"
+                                  className="flex-1 rounded-lg border border-brand-200 bg-brand-50/30 px-3 py-1.5 text-xs text-stone-900 cursor-default"
                                 />
                                 <span className="text-brand-500 flex-shrink-0" title="Linked to catalog">
                                   <Link2 size={14} />
@@ -1079,7 +1079,7 @@ export function PantryPage() {
                                 value={editState.name}
                                 placeholder="Item name"
                                 wrapperClassName="flex-1"
-                                className="w-full rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                                className="w-full rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs text-stone-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                                 onChange={(v) =>
                                   setEditState((s) =>
                                     s
@@ -1119,8 +1119,8 @@ export function PantryPage() {
                               placeholder="Greek name (optional)"
                               className={
                                 editState.masterIngredientId
-                                  ? "flex-1 rounded-lg border border-brand-200 bg-brand-50/30 px-3 py-1.5 text-sm text-stone-900 cursor-default focus:outline-none"
-                                  : "flex-1 rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                                  ? "flex-1 rounded-lg border border-brand-200 bg-brand-50/30 px-3 py-1.5 text-xs text-stone-900 cursor-default focus:outline-none"
+                                  : "flex-1 rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs text-stone-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                               }
                               readOnly={!!editState.masterIngredientId}
                             />
@@ -1139,7 +1139,7 @@ export function PantryPage() {
                                   s ? { ...s, quantity: e.target.value } : s
                                 )
                               }
-                              className="w-20 rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-700 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                              className="w-20 rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs text-stone-700 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                             />
                             <select
                               value={editState.unit}
@@ -1148,7 +1148,7 @@ export function PantryPage() {
                                   s ? { ...s, unit: e.target.value } : s
                                 )
                               }
-                              className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-700 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                              className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs text-stone-700 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                             >
                               <option value="">Unit</option>
                               {PANTRY_UNITS.map((u) => (
@@ -1169,13 +1169,13 @@ export function PantryPage() {
                                 s ? { ...s, note: e.target.value } : s
                               )
                             }
-                            className="w-full rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-700 placeholder:text-stone-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                            className="w-full rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs text-stone-700 placeholder:text-stone-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                           />
 
                           {/* Edit: Expiry & opened */}
                           <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
                             <div className="space-y-1">
-                              <span className="text-xs font-medium uppercase tracking-wider text-stone-500">
+                              <span className="text-[10px] font-medium uppercase tracking-wider text-stone-500">
                                 Expiry date
                               </span>
                               <input
@@ -1186,10 +1186,10 @@ export function PantryPage() {
                                     s ? { ...s, expiresOn: e.target.value } : s
                                   )
                                 }
-                                className="w-full max-w-xs rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-700 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                                className="w-full max-w-xs rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs text-stone-700 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                               />
                             </div>
-                            <label className="flex items-center gap-2 text-sm text-stone-600">
+                            <label className="flex items-center gap-2 text-xs text-stone-600">
                               <input
                                 type="checkbox"
                                 checked={editState.isOpened}
@@ -1333,7 +1333,7 @@ export function PantryPage() {
                                       : s
                                   )
                                 }
-                                className="w-full rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-colors"
+                                className="w-full rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs text-stone-900 placeholder:text-stone-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-colors"
                                 autoFocus
                               />
                             )}
@@ -1422,13 +1422,13 @@ export function PantryPage() {
                                 <div className="flex items-start gap-2">
                                   {expanded ? (
                                     <ChevronDown
-                                      size={16}
+                                      size={14}
                                       className="mt-0.5 flex-shrink-0 text-stone-400"
                                       aria-hidden
                                     />
                                   ) : (
                                     <ChevronRight
-                                      size={16}
+                                      size={14}
                                       className="mt-0.5 flex-shrink-0 text-stone-400"
                                       aria-hidden
                                     />
@@ -1437,16 +1437,16 @@ export function PantryPage() {
                                     <img
                                       src={item.imageUrl}
                                       alt=""
-                                      className="h-9 w-9 rounded-md object-cover border border-stone-200 flex-shrink-0"
+                                      className="h-8 w-8 rounded-md object-cover border border-stone-200 flex-shrink-0"
                                     />
                                   )}
-                                  <div className="min-w-0 flex-1 flex flex-col gap-1">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                      <span className="text-sm font-medium text-stone-800">
+                                  <div className="min-w-0 flex-1 flex flex-col gap-0.5">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                      <span className="text-xs font-medium text-stone-800">
                                         {item.name}
                                       </span>
                                       {item.nameSecondary && (
-                                        <span className="text-sm italic text-stone-400">
+                                        <span className="text-xs italic text-stone-400">
                                           ({item.nameSecondary})
                                         </span>
                                       )}
@@ -1456,13 +1456,13 @@ export function PantryPage() {
                                           title="Linked to catalog"
                                           aria-label="Linked to catalog"
                                         >
-                                          <Link2 size={14} aria-hidden />
+                                          <Link2 size={12} aria-hidden />
                                         </span>
                                       )}
                                     </div>
                                     {hasExpiry && alertMsg ? (
                                       <span
-                                        className={`text-xs flex items-center gap-1 font-medium ${
+                                        className={`text-[11px] leading-snug flex items-center gap-1 font-medium ${
                                           expStatus === "expired"
                                             ? "text-red-700"
                                             : "text-amber-800"
@@ -1470,13 +1470,13 @@ export function PantryPage() {
                                       >
                                         {expStatus === "expired" ? (
                                           <AlertTriangle
-                                            size={12}
+                                            size={11}
                                             className="flex-shrink-0"
                                             aria-hidden
                                           />
                                         ) : (
                                           <Calendar
-                                            size={12}
+                                            size={11}
                                             className="flex-shrink-0"
                                             aria-hidden
                                           />
@@ -1485,7 +1485,7 @@ export function PantryPage() {
                                       </span>
                                     ) : null}
                                     {hasAmount ? (
-                                      <span className="text-xs text-stone-500 block tabular-nums">
+                                      <span className="text-[11px] text-stone-500 block tabular-nums leading-snug">
                                         {item.quantity ?? ""}
                                         {item.unit ? ` ${item.unit}` : ""}
                                       </span>
@@ -1503,7 +1503,7 @@ export function PantryPage() {
                                     className="p-1.5 text-stone-400 hover:text-brand-600 transition-colors rounded-md hover:bg-stone-100 disabled:pointer-events-none disabled:opacity-40"
                                     title="Edit item"
                                   >
-                                    <Pencil size={14} />
+                                    <Pencil size={12} />
                                   </button>
                                   {item.masterIngredientId?.trim() && (
                                     <button
@@ -1520,7 +1520,7 @@ export function PantryPage() {
                                       title="Recipe suggestions"
                                       aria-label="Recipe suggestions with this ingredient"
                                     >
-                                      <Sparkles size={14} />
+                                      <Sparkles size={12} />
                                     </button>
                                   )}
                                   <button
@@ -1532,9 +1532,9 @@ export function PantryPage() {
                                     aria-label={`Restock ${item.name}`}
                                   >
                                     {refreshingItemId === item.id ? (
-                                      <Spinner className="h-3.5 w-3.5" />
+                                      <Spinner className="h-3 w-3" />
                                     ) : (
-                                      <RefreshCw size={14} />
+                                      <RefreshCw size={12} />
                                     )}
                                   </button>
                                   <button
@@ -1544,21 +1544,21 @@ export function PantryPage() {
                                     className="p-1.5 text-stone-400 hover:text-red-500 transition-colors rounded-md hover:bg-stone-100 disabled:pointer-events-none disabled:opacity-40"
                                     aria-label={`Remove ${item.name}`}
                                   >
-                                    <Trash2 size={16} />
+                                    <Trash2 size={14} />
                                   </button>
                                 </div>
                                 {(item.isOpened ||
                                   item.isStaple ||
                                   item.expiresOn) && (
-                                  <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-0.5 pr-0.5">
+                                  <div className="flex flex-wrap items-center justify-end gap-x-1.5 gap-y-0.5 pr-0.5">
                                     {item.isOpened ? (
                                       <span
-                                        className="inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-sky-100 text-sky-800"
+                                        className="inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-sky-100 text-sky-800"
                                         title="Opened"
                                         aria-label="Opened pack"
                                       >
                                         <PackageOpen
-                                          size={12}
+                                          size={11}
                                           strokeWidth={2.25}
                                           aria-hidden
                                         />
@@ -1566,12 +1566,12 @@ export function PantryPage() {
                                     ) : null}
                                     {item.isStaple ? (
                                       <span
-                                        className="inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700"
+                                        className="inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700"
                                         title="Staple"
                                         aria-label="Staple"
                                       >
                                         <Paperclip
-                                          size={12}
+                                          size={11}
                                           strokeWidth={2.25}
                                           aria-hidden
                                         />
@@ -1579,12 +1579,12 @@ export function PantryPage() {
                                     ) : null}
                                     {item.expiresOn ? (
                                       <span
-                                        className="inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-stone-300 text-stone-800"
+                                        className="inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-stone-300 text-stone-800"
                                         title="Expiry date set"
                                         aria-label="Has expiry date"
                                       >
                                         <Calendar
-                                          size={12}
+                                          size={11}
                                           className="flex-shrink-0"
                                           aria-hidden
                                         />
@@ -1606,16 +1606,16 @@ export function PantryPage() {
                                   role="region"
                                   aria-labelledby={headId}
                                   aria-hidden={!expanded}
-                                  className="border-t border-stone-100 bg-stone-50/70 px-4 py-4 sm:px-5 text-sm"
+                                  className="border-t border-stone-100 bg-stone-50/70 px-3 py-2 sm:px-4 sm:py-2.5 text-xs"
                                 >
                                   <div className="flex flex-col gap-0">
                                     {hasExpiry ? (
-                                      <div className="flex flex-wrap items-start justify-between gap-x-5 gap-y-1.5 border-b border-stone-100/90 pb-3.5">
-                                        <span className="text-xs font-medium uppercase tracking-wide text-stone-400 shrink-0 pt-0.5">
+                                      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-0.5 border-b border-stone-100/90 pb-1.5">
+                                        <span className="text-[10px] font-medium uppercase tracking-wide text-stone-400 shrink-0">
                                           Expiry
                                         </span>
                                         <div className="min-w-0 text-right">
-                                          <span className="text-stone-900">
+                                          <span className="text-stone-900 text-xs">
                                             {formatExpiresOnLabel(
                                               item.expiresOn!
                                             )}
@@ -1625,11 +1625,11 @@ export function PantryPage() {
                                     ) : null}
 
                                     {hasAmount ? (
-                                      <div className="flex flex-wrap items-baseline justify-between gap-x-5 gap-y-1 border-b border-stone-100/90 py-3.5">
-                                        <span className="text-xs font-medium uppercase tracking-wide text-stone-400 shrink-0">
+                                      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 border-b border-stone-100/90 py-1.5">
+                                        <span className="text-[10px] font-medium uppercase tracking-wide text-stone-400 shrink-0">
                                           Amount
                                         </span>
-                                        <span className="text-stone-900 tabular-nums text-right">
+                                        <span className="text-stone-900 tabular-nums text-right text-xs">
                                           {item.quantity ?? "—"}
                                           {item.unit ? (
                                             <span className="text-stone-600">
@@ -1642,27 +1642,27 @@ export function PantryPage() {
                                     ) : null}
 
                                     {item.isOpened ? (
-                                      <div className="flex flex-wrap items-baseline justify-between gap-x-5 gap-y-1 border-b border-stone-100/90 py-3.5">
-                                        <span className="text-xs font-medium uppercase tracking-wide text-stone-400 shrink-0">
+                                      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 border-b border-stone-100/90 py-1.5">
+                                        <span className="text-[10px] font-medium uppercase tracking-wide text-stone-400 shrink-0">
                                           Opened
                                         </span>
-                                        <span className="text-stone-900">
+                                        <span className="text-stone-900 text-xs">
                                           Yes
                                         </span>
                                       </div>
                                     ) : null}
 
                                     <div
-                                      className={`flex flex-wrap items-baseline justify-between gap-x-5 gap-y-1 py-3.5 ${
+                                      className={`flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 py-1.5 ${
                                         hasNote
                                           ? "border-b border-stone-100/90"
                                           : ""
                                       }`}
                                     >
-                                      <span className="text-xs font-medium uppercase tracking-wide text-stone-400 shrink-0">
+                                      <span className="text-[10px] font-medium uppercase tracking-wide text-stone-400 shrink-0">
                                         Date added
                                       </span>
-                                      <span className="text-stone-900 text-right">
+                                      <span className="text-stone-900 text-right text-xs">
                                         {item.addedAt.toLocaleDateString(
                                           undefined,
                                           {
@@ -1676,11 +1676,11 @@ export function PantryPage() {
                                     </div>
 
                                     {hasNote ? (
-                                      <div className="pt-1">
-                                        <span className="text-xs font-medium uppercase tracking-wide text-stone-400">
+                                      <div className="pt-0.5">
+                                        <span className="text-[10px] font-medium uppercase tracking-wide text-stone-400">
                                           Note
                                         </span>
-                                        <p className="mt-2 text-sm leading-relaxed text-stone-700 whitespace-pre-wrap">
+                                        <p className="mt-1 text-xs leading-snug text-stone-700 whitespace-pre-wrap">
                                           {item.note}
                                         </p>
                                       </div>

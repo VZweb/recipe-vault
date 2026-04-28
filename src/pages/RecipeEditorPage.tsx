@@ -961,7 +961,12 @@ export function RecipeEditorPage() {
                         type="button"
                         onClick={() => {
                           const s = recipeLineSuggestionMaster(ing)!;
-                          navigateToSuggestionsForIngredient(navigate, s.masterId, s.scope);
+                          navigateToSuggestionsForIngredient(
+                            navigate,
+                            s.masterId,
+                            s.scope,
+                            { forceAsExtra: true }
+                          );
                         }}
                         className="inline-flex rounded-md p-1.5 text-stone-400 transition-colors hover:bg-stone-100 hover:text-amber-600"
                         title="Recipe suggestions"

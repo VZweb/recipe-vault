@@ -519,7 +519,8 @@ export function RecipeDetailPage() {
                             navigateToSuggestionsForIngredient(
                               navigate,
                               suggestionTarget.masterId,
-                              suggestionTarget.scope
+                              suggestionTarget.scope,
+                              { forceAsExtra: true }
                             );
                           }}
                           className="rounded-md p-0.5 text-stone-400 transition-colors hover:bg-stone-100 hover:text-amber-600"
