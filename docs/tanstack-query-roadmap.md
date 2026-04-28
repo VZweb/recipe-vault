@@ -87,7 +87,7 @@ Keep the **public hook API** (`recipes`, `loading`, `error`, `refresh`) where po
 
 Any operation that changes recipe documents read by list queries should update or invalidate relevant keys:
 
-- `createRecipe`, `updateRecipe`, `deleteRecipe`, `incrementCookedCount` in `useRecipeMutations` / `firestore.ts`.
+- `createRecipe`, `updateRecipe`, `deleteRecipe`, `incrementCookedCount`, `decrementCookedCount` in `useRecipeMutations` / `firestore.ts`.
 - **Tag delete** and **category delete** in `firestore.ts` (batch updates on many recipes) — safest approach is **`queryClient.invalidateQueries({ queryKey: ['recipes'] })`** (prefix) so all filtered variants refetch, unless you implement precise `setQueryData` merging.
 
 ### Optional Phase 3b — Single recipe `useRecipe(id)`

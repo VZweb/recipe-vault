@@ -250,6 +250,23 @@ export async function incrementCookedCount(id: string): Promise<void> {
   });
 }
 
+/** Does nothing if cookedCount is already 0 (no negative counts). */
+export async function decrementCookedCount(id: string): Promise<void> {
+  const uid = requireUid();
+  const ref = doc(getUserRecipesCollection(db, uid), id);
+  await runTransaction(db, async (transaction) => {
+    const snap = await transaction.get(ref);
+    if (!snap.exists()) return;
+    const raw = snap.data().cookedCount;
+    const current = typeof raw === "number" && Number.isFinite(raw) ? raw : 0;
+    if (current <= 0) return;
+    transaction.update(ref, {
+      cookedCount: current - 1,
+      updatedAt: Timestamp.now(),
+    });
+  });
+}
+
 // --- Tags ---
 
 export async function fetchTags(): Promise<Tag[]> {

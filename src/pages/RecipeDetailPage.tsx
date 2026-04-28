@@ -9,8 +9,11 @@ import {
   Edit,
   ExternalLink,
   Link2,
+  Minus,
   Package,
   Play,
+  Plus,
+  Sparkles,
   Trash2,
   Users,
 } from "lucide-react";
@@ -23,6 +26,7 @@ import {
   ingredientLineLinkKeys,
   resolveMasterIngredient,
 } from "@/lib/ingredientRef";
+import { navigateToSuggestionsForIngredient, recipeLineSuggestionMaster } from "@/lib/suggestionsNavigation";
 import { Button } from "@/components/ui/Button";
 import { TagChip } from "@/components/ui/TagChip";
 import { CategoryIcon } from "@/components/ui/CategoryIcon";
@@ -41,7 +45,7 @@ export function RecipeDetailPage() {
   const { tags } = useTags();
   const { categories } = useCategories();
   const { ingredients: masterIngredients } = useIngredients();
-  const { remove, create, incrementCooked } = useRecipeMutations();
+  const { remove, create, incrementCooked, decrementCooked } = useRecipeMutations();
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [imageIdx, setImageIdx] = useState(0);
   const [cookedCount, setCookedCount] = useState(0);
@@ -68,6 +72,17 @@ export function RecipeDetailPage() {
     setCookedCount((c) => c + 1);
     await incrementCooked(recipe.id);
     await loadPantry();
+  };
+
+  const handleDecrementCookQuick = async () => {
+    if (!recipe || cookedCount <= 0) return;
+    const prev = cookedCount;
+    setCookedCount((c) => Math.max(0, c - 1));
+    try {
+      await decrementCooked(recipe.id);
+    } catch {
+      setCookedCount(prev);
+    }
   };
 
   const pantryLinkKeys = useMemo(
@@ -174,13 +189,36 @@ export function RecipeDetailPage() {
           Back to recipes
         </Link>
         <div className="flex items-center gap-2">
-          <Button variant="secondary" size="sm" onClick={() => setCookWizardOpen(true)}>
-            <ChefHat size={16} />
-            <span className="hidden sm:inline">I made this!</span>
-            <span className="inline-flex items-center justify-center rounded-full bg-brand-100 text-brand-700 text-xs font-semibold min-w-[1.25rem] h-5 px-1">
-              {cookedCount}
-            </span>
-          </Button>
+          <div className="inline-flex items-stretch overflow-hidden rounded-lg border border-stone-200 bg-white shadow-sm">
+            <button
+              type="button"
+              onClick={() => void handleDecrementCookQuick()}
+              disabled={cookedCount <= 0}
+              className="flex items-center justify-center px-2 py-1.5 text-stone-600 hover:bg-stone-50 disabled:pointer-events-none disabled:opacity-40"
+              aria-label="Decrease times cooked"
+            >
+              <Minus size={16} strokeWidth={2.25} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setCookWizardOpen(true)}
+              className="flex items-center gap-1.5 border-x border-stone-200 px-3 py-1.5 text-sm font-medium text-stone-800 hover:bg-brand-50/80 transition-colors"
+            >
+              <ChefHat size={16} className="text-brand-600 shrink-0" />
+              <span className="hidden sm:inline">I made this!</span>
+              <span className="inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-brand-100 px-1 h-5 text-xs font-semibold text-brand-700 tabular-nums">
+                {cookedCount}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setCookWizardOpen(true)}
+              className="flex items-center justify-center px-2 py-1.5 text-stone-600 hover:bg-stone-50"
+              aria-label="Log a cook and update pantry"
+            >
+              <Plus size={16} strokeWidth={2.25} />
+            </button>
+          </div>
           <Button variant="ghost" size="sm" onClick={handleDuplicate}>
             <Copy size={16} />
             <span className="hidden sm:inline">Duplicate</span>
@@ -361,6 +399,7 @@ export function RecipeDetailPage() {
                 const inPantry = isInPantry(ing);
                 const matchKind = pantryMatchKind(ing);
                 const subPantryName = matchKind === "substitute" ? matchedSubstituteName(ing) : null;
+                const suggestionTarget = recipeLineSuggestionMaster(ing);
                 const checked = checkedIngredients.has(i);
                 const toggleChecked = () =>
                   setCheckedIngredients((prev) => {
@@ -459,18 +498,38 @@ export function RecipeDetailPage() {
                         </p>
                       )}
                     </div>
-                    {inPantry && (
-                      <span
-                        className="mt-0.5 flex-shrink-0 text-green-600"
-                        title={
-                          matchKind === "substitute" && subPantryName
-                            ? `In pantry (matched alternative: ${subPantryName})`
-                            : "In pantry"
-                        }
-                      >
-                        <Package size={16} />
-                      </span>
-                    )}
+                    <span className="mt-0.5 flex flex-shrink-0 items-start gap-0.5">
+                      {inPantry && (
+                        <span
+                          className="text-green-600"
+                          title={
+                            matchKind === "substitute" && subPantryName
+                              ? `In pantry (matched alternative: ${subPantryName})`
+                              : "In pantry"
+                          }
+                        >
+                          <Package size={16} />
+                        </span>
+                      )}
+                      {suggestionTarget && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigateToSuggestionsForIngredient(
+                              navigate,
+                              suggestionTarget.masterId,
+                              suggestionTarget.scope
+                            );
+                          }}
+                          className="rounded-md p-0.5 text-stone-400 transition-colors hover:bg-stone-100 hover:text-amber-600"
+                          title="Recipe suggestions"
+                          aria-label="Recipe suggestions with this ingredient"
+                        >
+                          <Sparkles size={16} />
+                        </button>
+                      )}
+                    </span>
                   </li>
                 );
               })}

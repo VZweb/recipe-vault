@@ -6,6 +6,7 @@ import {
   updateRecipe,
   deleteRecipe,
   incrementCookedCount,
+  decrementCookedCount,
 } from "@/lib/firestore";
 import type { Recipe, RecipeFormData } from "@/types/recipe";
 
@@ -76,5 +77,9 @@ export function useRecipeMutations() {
     return incrementCookedCount(id);
   };
 
-  return { create, update, remove, incrementCooked };
+  const decrementCooked = async (id: string) => {
+    return decrementCookedCount(id);
+  };
+
+  return { create, update, remove, incrementCooked, decrementCooked };
 }

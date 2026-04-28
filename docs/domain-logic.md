@@ -12,6 +12,12 @@ If search behavior or fields change, update this doc and any UX copy that refers
 
 ## Suggestions (`suggestions.ts`)
 
+### Deep-link: focused ingredient on the Suggestions page
+
+The app can open **`/suggestions?masterId=<id>&scope=catalog|custom`** (legacy masters may omit `scope` or use an empty value for the `?:` bucket). In-app sparkles navigation also passes the same payload via **`location.state.suggestionsSeed`** so seeding does not rely on the query string surviving navigation timing. [`SuggestionsPage`](../src/pages/SuggestionsPage.tsx) reads **state first, then the URL**, once the pantry load finished and **master ingredients have been fetched at least once** (`mastersFetched`), **resolves the master** via [`resolveMasterIngredient`](../src/lib/ingredientRef.ts), and **appends one entry** to the same **`extraIngredients`** state used for “Extra ingredients I also have” — unless that ingredient’s **link key** is **already covered by a real pantry row**, in which case nothing is added (no redundant chip). State updates are applied with **`flushSync`** before clearing the URL so extras are not lost to React batching. [`suggestRecipes`](../src/lib/suggestions.ts) is unchanged.
+
+After applying, the URL is **`replace`d** to plain `/suggestions` so a refresh does not re-seed the same extra. That trades **shareable pre-filled links** in the address bar for predictable refresh behavior. URL building and navigation live in [`suggestionsNavigation`](../src/lib/suggestionsNavigation.ts). Catalog, pantry, recipe detail, and recipe editor surfaces use a small **sparkles** control; recipe lines use the **primary** master when present, otherwise the **first substitute** with a master link.
+
 `suggestRecipes(recipes, pantryItems)`:
 
 - Builds a `Set` of stable link keys from pantry rows (`ingredientLinkKey` from `masterIngredientId` + `masterIngredientScope`; legacy null scope uses a dedicated bucket so old data still matches).

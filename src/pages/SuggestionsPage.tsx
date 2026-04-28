@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { flushSync } from "react-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { Check, ChefHat, Clock, ClipboardCopy, Info, Link2, Percent, Users } from "lucide-react";
 import { useRecipes } from "@/hooks/useRecipes";
 import { useTags } from "@/hooks/useTags";
@@ -18,7 +19,12 @@ import {
   ingredientLinkKey,
   ingredientLineLinkKeys,
   masterScopeFromMasterIngredient,
+  resolveMasterIngredient,
 } from "@/lib/ingredientRef";
+import {
+  parseSuggestionIngredientParams,
+  type SuggestionsLocationState,
+} from "@/lib/suggestionsNavigation";
 
 interface ExtraIngredient {
   name: string;
@@ -28,9 +34,16 @@ interface ExtraIngredient {
 }
 
 export function SuggestionsPage() {
+  const [searchParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
   const { recipes, loading: loadingRecipes } = useRecipes();
   const { tags } = useTags();
-  const { ingredients: masterIngredients } = useIngredients();
+  const {
+    ingredients: masterIngredients,
+    loading: loadingMasters,
+    mastersFetched,
+  } = useIngredients();
   const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
   const [loadingPantry, setLoadingPantry] = useState(true);
   const [extraIngredient, setExtraIngredient] = useState("");
@@ -57,10 +70,30 @@ export function SuggestionsPage() {
     void loadPantry();
   }, [loadPantry]);
 
+  /** Dedupe by link key (and freeform name) so dev Strict Mode or repeat adds cannot double-count. */
+  const uniqueExtraIngredients = useMemo(() => {
+    const seenKeys = new Set<string>();
+    const seenFreeform = new Set<string>();
+    const out: ExtraIngredient[] = [];
+    for (const e of extraIngredients) {
+      const k = ingredientLinkKey(e.masterIngredientId, e.masterIngredientScope);
+      if (k) {
+        if (seenKeys.has(k)) continue;
+        seenKeys.add(k);
+      } else {
+        const n = e.name.trim().toLowerCase();
+        if (!n || seenFreeform.has(n)) continue;
+        seenFreeform.add(n);
+      }
+      out.push(e);
+    }
+    return out;
+  }, [extraIngredients]);
+
   const combinedPantry = useMemo<PantryItem[]>(
     () => [
       ...pantryItems,
-      ...extraIngredients.map((e, i) => ({
+      ...uniqueExtraIngredients.map((e, i) => ({
         id: e.masterIngredientId ? `extra-${e.masterIngredientId}` : `extra-freeform-${i}`,
         name: e.name,
         nameSecondary: e.nameSecondary || null,
@@ -78,7 +111,7 @@ export function SuggestionsPage() {
         addedAt: new Date(),
       })),
     ],
-    [pantryItems, extraIngredients]
+    [pantryItems, uniqueExtraIngredients]
   );
 
   const suggestions = useMemo(
@@ -87,9 +120,9 @@ export function SuggestionsPage() {
   );
 
   const matchedExtrasPerRecipe = useMemo(() => {
-    if (extraIngredients.length === 0) return new Map<string, string[]>();
+    if (uniqueExtraIngredients.length === 0) return new Map<string, string[]>();
     const extraByLinkKey = new Map(
-      extraIngredients
+      uniqueExtraIngredients
         .map((e) => {
           const k = ingredientLinkKey(e.masterIngredientId, e.masterIngredientScope);
           return k ? ([k, e.name] as const) : null;
@@ -113,30 +146,30 @@ export function SuggestionsPage() {
       if (hits.length > 0) map.set(s.recipe.id, hits);
     }
     return map;
-  }, [extraIngredients, suggestions]);
+  }, [uniqueExtraIngredients, suggestions]);
 
   const unmatchedExtras = useMemo(() => {
-    if (extraIngredients.length === 0) return [];
+    if (uniqueExtraIngredients.length === 0) return [];
     const matchedExtraNames = new Set(
       Array.from(matchedExtrasPerRecipe.values()).flat().map((n) => n.toLowerCase())
     );
-    return extraIngredients.filter(
+    return uniqueExtraIngredients.filter(
       (e) => !matchedExtraNames.has(e.name.toLowerCase())
     );
-  }, [extraIngredients, matchedExtrasPerRecipe]);
+  }, [uniqueExtraIngredients, matchedExtrasPerRecipe]);
 
   const noRecipeWithAllExtras = useMemo(() => {
-    if (extraIngredients.length < 2) return false;
-    const linkedCount = extraIngredients.filter((e) => e.masterIngredientId).length;
+    if (uniqueExtraIngredients.length < 2) return false;
+    const linkedCount = uniqueExtraIngredients.filter((e) => e.masterIngredientId).length;
     if (linkedCount < 2) return false;
     for (const hits of matchedExtrasPerRecipe.values()) {
       if (hits.length >= linkedCount) return false;
     }
     return true;
-  }, [extraIngredients, matchedExtrasPerRecipe]);
+  }, [uniqueExtraIngredients, matchedExtrasPerRecipe]);
 
   const sortedSuggestions = useMemo(() => {
-    if (extraIngredients.length === 0) return suggestions;
+    if (uniqueExtraIngredients.length === 0) return suggestions;
     const extrasMap = matchedExtrasPerRecipe;
     return [...suggestions].sort((a, b) => {
       const aExtras = extrasMap.get(a.recipe.id)?.length ?? 0;
@@ -144,7 +177,7 @@ export function SuggestionsPage() {
       if (aExtras !== bExtras) return bExtras - aExtras;
       return b.matchPercentage - a.matchPercentage;
     });
-  }, [suggestions, extraIngredients.length, matchedExtrasPerRecipe]);
+  }, [suggestions, uniqueExtraIngredients.length, matchedExtrasPerRecipe]);
 
   const pantryLinkKeys = useMemo(
     () =>
@@ -155,6 +188,80 @@ export function SuggestionsPage() {
       ),
     [pantryItems]
   );
+
+  useEffect(() => {
+    const state = location.state as SuggestionsLocationState | undefined;
+    const fromState = state?.suggestionsSeed;
+    const raw = new URLSearchParams(searchParams.toString());
+    const fromUrl = parseSuggestionIngredientParams(raw);
+    const parsed = fromState ?? fromUrl;
+
+    if (!parsed) {
+      if (raw.get("masterId")) {
+        navigate("/suggestions", { replace: true, state: {} });
+      }
+      return;
+    }
+
+    if (loadingPantry || !mastersFetched) return;
+
+    const key = ingredientLinkKey(parsed.masterId, parsed.scope);
+    if (!key) {
+      navigate("/suggestions", { replace: true, state: {} });
+      return;
+    }
+
+    if (pantryLinkKeys.has(key)) {
+      navigate("/suggestions", { replace: true, state: {} });
+      return;
+    }
+
+    const mi = resolveMasterIngredient(
+      parsed.masterId,
+      parsed.scope,
+      masterIngredients
+    );
+    if (!mi) {
+      navigate("/suggestions", { replace: true, state: {} });
+      return;
+    }
+
+    const scope: MasterIngredientScope =
+      parsed.scope === "catalog" || parsed.scope === "custom"
+        ? parsed.scope
+        : masterScopeFromMasterIngredient(mi);
+
+    flushSync(() => {
+      setExtraIngredients((prev) => {
+        if (
+          prev.some(
+            (e) => ingredientLinkKey(e.masterIngredientId, e.masterIngredientScope) === key
+          )
+        ) {
+          return prev;
+        }
+        return [
+          ...prev,
+          {
+            name: mi.name,
+            nameSecondary: mi.nameGr ?? "",
+            masterIngredientId: parsed.masterId,
+            masterIngredientScope: scope,
+          },
+        ];
+      });
+    });
+
+    navigate("/suggestions", { replace: true, state: {} });
+  }, [
+    location.state,
+    searchParams,
+    loadingPantry,
+    mastersFetched,
+    pantryLinkKeys,
+    masterIngredients,
+    navigate,
+  ]);
 
   const pantryNames = useMemo(
     () => new Set(pantryItems.map((p) => p.normalizedName)),
@@ -210,10 +317,10 @@ export function SuggestionsPage() {
       lines.push(`${cat}: ${catItems.map(formatItem).join(", ")}`);
     }
 
-    if (extraIngredients.length > 0) {
+    if (uniqueExtraIngredients.length > 0) {
       lines.push("");
       lines.push(
-        `Extra ingredients I also have: ${extraIngredients.map((e) => e.name).join(", ")}`
+        `Extra ingredients I also have: ${uniqueExtraIngredients.map((e) => e.name).join(", ")}`
       );
     }
 
@@ -228,7 +335,7 @@ export function SuggestionsPage() {
     lines.push("Suggest 1 recipe I can make with these ingredients.");
 
     return lines.join("\n");
-  }, [pantryItems, extraIngredients]);
+  }, [pantryItems, uniqueExtraIngredients]);
 
   const handleCopyPrompt = async () => {
     const prompt = buildRecipePrompt();
@@ -237,7 +344,7 @@ export function SuggestionsPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const loading = loadingRecipes || loadingPantry;
+  const loading = loadingRecipes || loadingPantry || loadingMasters;
 
   return (
     <div className="space-y-6">
@@ -305,12 +412,15 @@ export function SuggestionsPage() {
         </div>
       </form>
 
-      {extraIngredients.length > 0 && (
+      {uniqueExtraIngredients.length > 0 && (
         <div className="flex flex-wrap gap-2">
           <span className="text-xs text-stone-500 self-center">Extra:</span>
-          {extraIngredients.map((ing, i) => (
+          {uniqueExtraIngredients.map((ing) => {
+            const lk = ingredientLinkKey(ing.masterIngredientId, ing.masterIngredientScope);
+            const chipKey = lk ?? `ff:${ing.name.toLowerCase()}`;
+            return (
             <span
-              key={i}
+              key={chipKey}
               className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${
                 (ing.masterIngredientId
                   ? pantryLinkKeys.has(
@@ -324,15 +434,25 @@ export function SuggestionsPage() {
               {ing.masterIngredientId && <Link2 size={12} className="shrink-0" />}
               {ing.name}
               <button
+                type="button"
                 onClick={() =>
-                  setExtraIngredients((prev) => prev.filter((_, j) => j !== i))
+                  setExtraIngredients((prev) =>
+                    prev.filter((p) => {
+                      const pk = ingredientLinkKey(p.masterIngredientId, p.masterIngredientScope);
+                      if (lk && pk) return pk !== lk;
+                      if (!lk && !pk)
+                        return p.name.trim().toLowerCase() !== ing.name.trim().toLowerCase();
+                      return true;
+                    })
+                  )
                 }
                 className="ml-0.5 hover:opacity-70"
               >
                 x
               </button>
             </span>
-          ))}
+            );
+          })}
           <button
             onClick={() => setExtraIngredients([])}
             className="self-center rounded-full px-2 py-0.5 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
@@ -367,7 +487,7 @@ export function SuggestionsPage() {
               <p>
                 No single recipe contains all of{" "}
                 <span className="font-semibold">
-                  {extraIngredients.map((e) => e.name).join(", ")}
+                  {uniqueExtraIngredients.map((e) => e.name).join(", ")}
                 </span>
                 . Showing the best matches below.
               </p>
@@ -393,7 +513,7 @@ export function SuggestionsPage() {
             </Link>
           }
         />
-      ) : extraIngredients.length > 0 ? (
+      ) : uniqueExtraIngredients.length > 0 ? (
         <EmptyState
           icon={<ChefHat size={48} />}
           title="No recipes match your ingredients"

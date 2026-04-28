@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   AlertTriangle,
   Calendar,
@@ -18,6 +19,7 @@ import {
   Plus,
   RefreshCw,
   Search,
+  Sparkles,
   Trash2,
   X,
 } from "lucide-react";
@@ -43,6 +45,7 @@ import type { PantryItem, PantryCategory } from "@/types/pantry";
 import { PANTRY_CATEGORIES, PANTRY_UNITS } from "@/types/pantry";
 import type { MasterIngredientScope } from "@/types/ingredientRef";
 import { ingredientLinkKey, masterScopeFromMasterIngredient } from "@/lib/ingredientRef";
+import { navigateToSuggestionsForIngredient } from "@/lib/suggestionsNavigation";
 import {
   formatExpiresOnLabel,
   getPantryExpiryAlertMessage,
@@ -81,6 +84,7 @@ interface EditState {
 }
 
 export function PantryPage() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [items, setItems] = useState<PantryItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1501,6 +1505,23 @@ export function PantryPage() {
                                   >
                                     <Pencil size={14} />
                                   </button>
+                                  {item.masterIngredientId?.trim() && (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        navigateToSuggestionsForIngredient(
+                                          navigate,
+                                          item.masterIngredientId.trim(),
+                                          item.masterIngredientScope
+                                        )
+                                      }
+                                      className="p-1.5 text-stone-400 hover:text-amber-600 transition-colors rounded-md hover:bg-stone-100"
+                                      title="Recipe suggestions"
+                                      aria-label="Recipe suggestions with this ingredient"
+                                    >
+                                      <Sparkles size={14} />
+                                    </button>
+                                  )}
                                   <button
                                     type="button"
                                     onClick={() => setPantryItemToRefresh(item)}

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Check,
   ChevronDown,
@@ -10,6 +11,7 @@ import {
   Pencil,
   Plus,
   Search,
+  Sparkles,
   Trash2,
   X,
 } from "lucide-react";
@@ -19,6 +21,7 @@ import { refreshAuthIdToken } from "@/lib/firebase";
 import { normalizeText } from "@/lib/normalize";
 import { addPantryItem, fetchPantryItems } from "@/lib/firestore";
 import { ingredientLinkKey, masterScopeFromMasterIngredient } from "@/lib/ingredientRef";
+import { navigateToSuggestionsForIngredient } from "@/lib/suggestionsNavigation";
 import type { PantryItem } from "@/types/pantry";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -38,6 +41,7 @@ interface EditState {
 }
 
 export function IngredientsPage() {
+  const navigate = useNavigate();
   const { user, catalogAdmin } = useAuth();
   const { ingredients, loading, add, addCatalog, update, remove } = useIngredients();
   const [newName, setNewName] = useState("");
@@ -693,6 +697,21 @@ export function IngredientsPage() {
                                 Pantry
                               </button>
                             )}
+                            <button
+                              type="button"
+                              onClick={() =>
+                                navigateToSuggestionsForIngredient(
+                                  navigate,
+                                  item.id,
+                                  masterScopeFromMasterIngredient(item)
+                                )
+                              }
+                              className="p-1 text-stone-400 hover:text-amber-600 transition-colors rounded-md hover:bg-stone-100"
+                              title="Recipe suggestions"
+                              aria-label="Recipe suggestions with this ingredient"
+                            >
+                              <Sparkles size={14} />
+                            </button>
                             {(!item.isCatalog || catalogAdmin) && (
                               <>
                                 <button

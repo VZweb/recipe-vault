@@ -16,7 +16,12 @@ export function useIngredients() {
   const queryClient = useQueryClient();
   const uid = user?.uid ?? "";
 
-  const { data: ingredients = [], isPending: loading, refetch } = useQuery({
+  const {
+    data: ingredients = [],
+    isPending: loading,
+    isFetched: mastersFetched,
+    refetch,
+  } = useQuery({
     queryKey: queryKeys.masterIngredients(uid),
     queryFn: async (): Promise<MasterIngredient[]> => {
       try {
@@ -78,5 +83,5 @@ export function useIngredients() {
     );
   };
 
-  return { ingredients, loading, add, addCatalog, update, remove, refresh };
+  return { ingredients, loading, mastersFetched, add, addCatalog, update, remove, refresh };
 }

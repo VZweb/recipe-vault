@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { AlertTriangle, ArrowLeft, ChevronDown, ChevronUp, ClipboardPaste, ImagePlus, LayoutList, Link, Link2, MessageSquare, Plus, Trash2, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ChevronDown, ChevronUp, ClipboardPaste, ImagePlus, LayoutList, Link, Link2, MessageSquare, Plus, Sparkles, Trash2, X } from "lucide-react";
 import { parseIngredientText } from "@/lib/parseIngredients";
 import { parseStepsText } from "@/lib/parseSteps";
 import { useRecipe, useRecipeMutations } from "@/hooks/useRecipes";
@@ -23,6 +23,7 @@ import {
   masterScopeFromMasterIngredient,
   resolveMasterIngredient,
 } from "@/lib/ingredientRef";
+import { navigateToSuggestionsForIngredient, recipeLineSuggestionMaster } from "@/lib/suggestionsNavigation";
 
 function emptyIngredient(sortOrder: number): Ingredient {
   return {
@@ -955,6 +956,20 @@ export function RecipeEditorPage() {
                     </button>
                   </div>
                   <div className="flex flex-shrink-0 items-center gap-0.5">
+                    {recipeLineSuggestionMaster(ing) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const s = recipeLineSuggestionMaster(ing)!;
+                          navigateToSuggestionsForIngredient(navigate, s.masterId, s.scope);
+                        }}
+                        className="inline-flex rounded-md p-1.5 text-stone-400 transition-colors hover:bg-stone-100 hover:text-amber-600"
+                        title="Recipe suggestions"
+                        aria-label="Recipe suggestions with this ingredient"
+                      >
+                        <Sparkles size={14} />
+                      </button>
+                    )}
                     {ingredientLineLinkKeys(ing).length > 0 ? (
                       <span title="Linked to catalog (primary or alternative)" className="inline-flex p-1.5 text-brand-500">
                         <Link2 size={14} />

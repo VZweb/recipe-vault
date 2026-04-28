@@ -26,7 +26,7 @@ Routes live in `src/App.tsx`. Unauthenticated visitors are redirected to **`/log
 | `/tags` | — | Redirects to `/organize?tab=tags` |
 | `/pantry` | `PantryPage` | |
 | `/ingredients` | `IngredientsPage` | Master ingredients catalog |
-| `/suggestions` | `SuggestionsPage` | “What can I cook?” |
+| `/suggestions` | `SuggestionsPage` | “What can I cook?” Optional query `masterId` + `scope` (`catalog` / `custom`) pre-seeds one extra ingredient; see [domain logic](./domain-logic.md). |
 
 **Recipe ingredient alternatives:** Optional per-line **`substituteLinks`** (extra catalog/custom masters that OR-match pantry and suggestions) are edited in **`RecipeEditorPage`** and listed read-only on **`RecipeDetailPage`**. See [Domain logic — Recipe ingredient alternatives (substituteLinks)](./domain-logic.md#recipe-ingredient-alternatives-substitutelinks).
 
