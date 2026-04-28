@@ -48,6 +48,7 @@ export function CookPantryWizardDialog({
   const [stepIndex, setStepIndex] = useState(0);
   const [qty, setQty] = useState("");
   const [unit, setUnit] = useState("");
+  const [expiresOn, setExpiresOn] = useState("");
   const [opened, setOpened] = useState(false);
   const [pending, setPending] = useState<null | "save" | "remove">(null);
   const busy = pending !== null;
@@ -65,6 +66,17 @@ export function CookPantryWizardDialog({
 
   useEffect(() => {
     if (!open) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
     countedRef.current = false;
     setPending(null);
     setStapleRemoveConfirm(false);
@@ -74,10 +86,15 @@ export function CookPantryWizardDialog({
     }
   }, [open, queue.length]);
 
+  /** Step 0 is the first panel after open (no swipe). Later steps mount with swipe-in. */
+  const shouldSwipeInStep =
+    open && mode === "items" && queue.length > 0 && stepIndex > 0;
+
   useEffect(() => {
     if (!open || queue.length === 0 || mode !== "items" || !current) return;
     setQty(current.pantryItem.quantity?.toString() ?? "");
     setUnit(current.pantryItem.unit ?? "");
+    setExpiresOn(current.pantryItem.expiresOn ?? "");
     setOpened(current.pantryItem.isOpened);
     setStapleRemoveConfirm(false);
   }, [open, queue.length, mode, stepIndex, current]);
@@ -151,9 +168,11 @@ export function CookPantryWizardDialog({
     try {
       const q = qty.trim() ? Number(qty) : null;
       const u = unit.trim() || null;
+      const exp = expiresOn.trim() || null;
       await updatePantryItem(current.pantryItem.id, {
         quantity: q,
         unit: u,
+        expiresOn: exp,
         isOpened: opened,
       });
       advanceOrComplete();
@@ -232,7 +251,7 @@ export function CookPantryWizardDialog({
           </div>
         )}
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
+        <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-4 py-4 sm:px-5">
           {total === 0 && (
             <div className="space-y-4">
               <div className="flex justify-center text-stone-400">
@@ -252,128 +271,149 @@ export function CookPantryWizardDialog({
           )}
 
           {total > 0 && mode === "items" && current && (
-            <div key={stepIndex} className="cook-pantry-step-animate space-y-5">
-              <p className="text-center text-xs font-medium text-stone-500">
-                Pantry item {stepNum} of {total}
-              </p>
+            <div key={stepIndex}>
+              <div
+                className={`space-y-5${shouldSwipeInStep ? " cook-pantry-step-animate" : ""}`}
+              >
+                <p className="text-center text-xs font-medium text-stone-500">
+                  Pantry item {stepNum} of {total}
+                </p>
 
-              <div className="rounded-lg border border-stone-200 bg-stone-50/80 p-4">
-                <p className="text-xs font-medium uppercase tracking-wide text-stone-400">
-                  Recipe
-                </p>
-                <p className="mt-1 text-sm font-medium text-stone-800">
-                  {recipeLineLabel(current)}
-                </p>
-                {current.ingredient.note?.trim() ? (
-                  <p className="mt-1 text-xs text-stone-500 italic">
-                    {current.ingredient.note}
+                <div className="rounded-lg border border-stone-200 bg-stone-50/80 p-4">
+                  <p className="text-xs font-medium uppercase tracking-wide text-stone-400">
+                    Recipe
                   </p>
-                ) : null}
-              </div>
+                  <p className="mt-1 text-sm font-medium text-stone-800">
+                    {recipeLineLabel(current)}
+                  </p>
+                  {current.ingredient.note?.trim() ? (
+                    <p className="mt-1 text-xs text-stone-500 italic">
+                      {current.ingredient.note}
+                    </p>
+                  ) : null}
+                </div>
 
-              <div className="rounded-lg border border-green-200 bg-green-50/60 p-4">
-                <div className="flex items-start gap-2">
-                  <Package
-                    className="mt-0.5 h-4 w-4 shrink-0 text-green-600"
-                    aria-hidden
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-medium uppercase tracking-wide text-green-800/90">
-                      In your pantry
-                    </p>
-                    <p className="mt-1 text-sm font-semibold text-stone-900">
-                      {current.pantryItem.name}
-                      {current.pantryItem.nameSecondary ? (
-                        <span className="font-normal text-stone-500">
-                          {" "}
-                          ({current.pantryItem.nameSecondary})
-                        </span>
-                      ) : null}
-                    </p>
-                    {current.matchKind === "substitute" && (
-                      <p className="mt-1 flex flex-wrap items-center gap-1 text-xs text-stone-600">
-                        <Link2 size={12} className="shrink-0 text-brand-500" />
-                        <span>
-                          Matched alternative
-                          {(() => {
-                            const subName = substituteLabel(current);
-                            return subName ? `: ${subName}` : "";
-                          })()}
-                        </span>
+                <div className="rounded-lg border border-green-200 bg-green-50/60 p-4">
+                  <div className="flex items-start gap-2">
+                    <Package
+                      className="mt-0.5 h-4 w-4 shrink-0 text-green-600"
+                      aria-hidden
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-medium uppercase tracking-wide text-green-800/90">
+                        In your pantry
                       </p>
-                    )}
+                      <p className="mt-1 text-sm font-semibold text-stone-900">
+                        {current.pantryItem.name}
+                        {current.pantryItem.nameSecondary ? (
+                          <span className="font-normal text-stone-500">
+                            {" "}
+                            ({current.pantryItem.nameSecondary})
+                          </span>
+                        ) : null}
+                      </p>
+                      {current.matchKind === "substitute" && (
+                        <p className="mt-1 flex flex-wrap items-center gap-1 text-xs text-stone-600">
+                          <Link2 size={12} className="shrink-0 text-brand-500" />
+                          <span>
+                            Matched alternative
+                            {(() => {
+                              const subName = substituteLabel(current);
+                              return subName ? `: ${subName}` : "";
+                            })()}
+                          </span>
+                        </p>
+                      )}
+                    </div>
                   </div>
+                </div>
+
+                {stapleRemoveConfirm && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                    This is a staple. Remove it from the pantry anyway?
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => setStapleRemoveConfirm(false)}
+                        disabled={busy}
+                      >
+                        Keep in pantry
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="danger"
+                        onClick={() => void handleRemove()}
+                        disabled={busy}
+                      >
+                        Remove anyway
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 items-end gap-2">
+                    <div className="min-w-0 space-y-1.5">
+                      <p className="text-xs font-medium uppercase tracking-wide text-stone-500">
+                        Update amount
+                      </p>
+                      <div className="flex min-w-0 items-end gap-2">
+                        <input
+                          type="number"
+                          min="0"
+                          step="any"
+                          placeholder="Qty"
+                          value={qty}
+                          onChange={(e) => setQty(e.target.value)}
+                          disabled={busy}
+                          className="w-16 rounded-lg border border-stone-300 bg-white px-2 py-2 text-sm text-stone-800 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 sm:w-20"
+                        />
+                        <select
+                          value={unit}
+                          onChange={(e) => setUnit(e.target.value)}
+                          disabled={busy}
+                          className="min-w-0 flex-1 rounded-lg border border-stone-300 bg-white px-2 py-2 text-sm text-stone-800 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                        >
+                          <option value="">Unit</option>
+                          {PANTRY_UNITS.map((u) => (
+                            <option key={u} value={u}>
+                              {u}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="min-w-0 space-y-1.5">
+                      <p className="text-left text-xs font-medium uppercase tracking-wide text-stone-500">
+                        Expiry date
+                      </p>
+                      <input
+                        type="date"
+                        value={expiresOn}
+                        onChange={(e) => setExpiresOn(e.target.value)}
+                        disabled={busy}
+                        className="w-full min-w-0 rounded-lg border border-stone-300 bg-white px-2 py-2 text-sm text-stone-800 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+                        aria-label="Expiry date"
+                      />
+                    </div>
+                  </div>
+                  <label className="flex items-center gap-2 text-sm text-stone-700">
+                    <input
+                      type="checkbox"
+                      checked={opened}
+                      onChange={(e) => setOpened(e.target.checked)}
+                      disabled={busy}
+                      className="h-4 w-4 rounded border-stone-300 text-brand-600 focus:ring-brand-500"
+                    />
+                    Mark as opened
+                  </label>
                 </div>
               </div>
 
-              {stapleRemoveConfirm && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-                  This is a staple. Remove it from the pantry anyway?
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => setStapleRemoveConfirm(false)}
-                      disabled={busy}
-                    >
-                      Keep in pantry
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="danger"
-                      onClick={() => void handleRemove()}
-                      disabled={busy}
-                    >
-                      Remove anyway
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              <div className="space-y-3">
-                <p className="text-xs font-medium uppercase tracking-wide text-stone-500">
-                  Update amount (optional)
-                </p>
-                <div className="flex flex-wrap items-end gap-2">
-                  <input
-                    type="number"
-                    min="0"
-                    step="any"
-                    placeholder="Qty"
-                    value={qty}
-                    onChange={(e) => setQty(e.target.value)}
-                    disabled={busy}
-                    className="w-24 rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-800 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-                  />
-                  <select
-                    value={unit}
-                    onChange={(e) => setUnit(e.target.value)}
-                    disabled={busy}
-                    className="min-w-[6rem] rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-800 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-                  >
-                    <option value="">Unit</option>
-                    {PANTRY_UNITS.map((u) => (
-                      <option key={u} value={u}>
-                        {u}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <label className="flex items-center gap-2 text-sm text-stone-700">
-                  <input
-                    type="checkbox"
-                    checked={opened}
-                    onChange={(e) => setOpened(e.target.checked)}
-                    disabled={busy}
-                    className="h-4 w-4 rounded border-stone-300 text-brand-600 focus:ring-brand-500"
-                  />
-                  Mark as opened
-                </label>
-              </div>
-
-              <div className="flex min-w-0 flex-row gap-1.5 border-t border-stone-100 pt-4 sm:gap-2">
+              <div className="mt-5 flex min-w-0 flex-row gap-1.5 border-t border-stone-100 pt-4 sm:gap-2">
                 <Button
                   type="button"
                   variant="primary"
