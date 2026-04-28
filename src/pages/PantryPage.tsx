@@ -1512,7 +1512,8 @@ export function PantryPage() {
                                         navigateToSuggestionsForIngredient(
                                           navigate,
                                           item.masterIngredientId.trim(),
-                                          item.masterIngredientScope
+                                          item.masterIngredientScope,
+                                          { forceAsExtra: true }
                                         )
                                       }
                                       className="p-1.5 text-stone-400 hover:text-amber-600 transition-colors rounded-md hover:bg-stone-100"

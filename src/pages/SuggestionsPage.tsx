@@ -191,10 +191,13 @@ export function SuggestionsPage() {
 
   useEffect(() => {
     const state = location.state as SuggestionsLocationState | undefined;
-    const fromState = state?.suggestionsSeed;
+    const seed = state?.suggestionsSeed;
     const raw = new URLSearchParams(searchParams.toString());
     const fromUrl = parseSuggestionIngredientParams(raw);
-    const parsed = fromState ?? fromUrl;
+    const parsed = seed
+      ? { masterId: seed.masterId, scope: seed.scope }
+      : fromUrl;
+    const forceAsExtra = Boolean(seed?.forceAsExtra);
 
     if (!parsed) {
       if (raw.get("masterId")) {
@@ -211,7 +214,7 @@ export function SuggestionsPage() {
       return;
     }
 
-    if (pantryLinkKeys.has(key)) {
+    if (pantryLinkKeys.has(key) && !forceAsExtra) {
       navigate("/suggestions", { replace: true, state: {} });
       return;
     }

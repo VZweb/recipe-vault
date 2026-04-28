@@ -3,7 +3,12 @@ import type { MasterIngredientScope } from "@/types/ingredientRef";
 import type { Ingredient } from "@/types/recipe";
 
 /** Passed through router `location.state` so seeding survives batched navigation before React commits. */
-export type SuggestionsSeed = { masterId: string; scope: MasterIngredientScope };
+export type SuggestionsSeed = {
+  masterId: string;
+  scope: MasterIngredientScope;
+  /** When true, still add as an extra for UI / ranking even if this key is already in the real pantry (e.g. sparkles from Pantry). */
+  forceAsExtra?: boolean;
+};
 
 export type SuggestionsLocationState = { suggestionsSeed?: SuggestionsSeed };
 
@@ -35,7 +40,8 @@ export function buildSuggestionsUrl(
 export function navigateToSuggestionsForIngredient(
   navigate: NavigateFunction,
   masterIngredientId: string,
-  scope: MasterIngredientScope
+  scope: MasterIngredientScope,
+  options?: { forceAsExtra?: boolean }
 ): void {
   const id = masterIngredientId.trim();
   navigate(
@@ -45,7 +51,11 @@ export function navigateToSuggestionsForIngredient(
     },
     {
       state: {
-        suggestionsSeed: { masterId: id, scope } as SuggestionsSeed,
+        suggestionsSeed: {
+          masterId: id,
+          scope,
+          ...(options?.forceAsExtra ? { forceAsExtra: true } : {}),
+        } as SuggestionsSeed,
       },
     }
   );
