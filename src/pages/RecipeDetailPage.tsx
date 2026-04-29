@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import {
   ArrowLeft,
@@ -10,6 +10,7 @@ import {
   ExternalLink,
   Link2,
   Minus,
+  MoreVertical,
   Package,
   Play,
   Plus,
@@ -53,6 +54,8 @@ export function RecipeDetailPage() {
   const [checkedSteps, setCheckedSteps] = useState<Set<number>>(new Set());
   const [checkedIngredients, setCheckedIngredients] = useState<Set<number>>(new Set());
   const [cookWizardOpen, setCookWizardOpen] = useState(false);
+  const [actionsMenuOpen, setActionsMenuOpen] = useState(false);
+  const actionsMenuRef = useRef<HTMLDivElement>(null);
 
   const loadPantry = useCallback(async () => {
     const items = await fetchPantryItems();
@@ -66,6 +69,27 @@ export function RecipeDetailPage() {
   useEffect(() => {
     if (recipe) setCookedCount(recipe.cookedCount);
   }, [recipe]);
+
+  useEffect(() => {
+    if (!actionsMenuOpen) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (
+        actionsMenuRef.current &&
+        !actionsMenuRef.current.contains(e.target as Node)
+      ) {
+        setActionsMenuOpen(false);
+      }
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setActionsMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [actionsMenuOpen]);
 
   const handleCountedCook = async (_reason: CookCountedReason) => {
     if (!recipe) return;
@@ -219,24 +243,59 @@ export function RecipeDetailPage() {
               <Plus size={16} strokeWidth={2.25} />
             </button>
           </div>
-          <Button variant="ghost" size="sm" onClick={handleDuplicate}>
-            <Copy size={16} />
-            <span className="hidden sm:inline">Duplicate</span>
-          </Button>
-          <Link to={`/recipes/${recipe.id}/edit`}>
-            <Button variant="secondary" size="sm">
-              <Edit size={16} />
-              <span className="hidden sm:inline">Edit</span>
+          <div className="relative" ref={actionsMenuRef}>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              aria-expanded={actionsMenuOpen}
+              aria-haspopup="menu"
+              aria-label="Recipe actions"
+              onClick={() => setActionsMenuOpen((o) => !o)}
+            >
+              <MoreVertical size={16} />
             </Button>
-          </Link>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="!text-red-500 hover:!bg-red-50"
-            onClick={() => setDeleteOpen(true)}
-          >
-            <Trash2 size={16} />
-          </Button>
+            {actionsMenuOpen && (
+              <div
+                className="absolute right-0 top-full z-50 mt-1 min-w-[12rem] rounded-lg border border-stone-200 bg-white py-1 shadow-lg"
+                role="menu"
+              >
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-stone-700 hover:bg-stone-50"
+                  onClick={() => {
+                    setActionsMenuOpen(false);
+                    void handleDuplicate();
+                  }}
+                >
+                  <Copy size={16} className="shrink-0 text-stone-500" />
+                  Duplicate
+                </button>
+                <Link
+                  to={`/recipes/${recipe.id}/edit`}
+                  role="menuitem"
+                  className="flex w-full items-center gap-2 px-3 py-2 text-sm text-stone-700 hover:bg-stone-50"
+                  onClick={() => setActionsMenuOpen(false)}
+                >
+                  <Edit size={16} className="shrink-0 text-stone-500" />
+                  Edit
+                </Link>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                  onClick={() => {
+                    setActionsMenuOpen(false);
+                    setDeleteOpen(true);
+                  }}
+                >
+                  <Trash2 size={16} className="shrink-0" />
+                  Delete
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -357,16 +416,6 @@ export function RecipeDetailPage() {
           </div>
         )}
       </div>
-
-      {/* Notes */}
-      {recipe.notes && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-5">
-          <h2 className="text-lg font-semibold text-stone-800 mb-2">Notes</h2>
-          <p className="text-sm text-stone-700 leading-relaxed whitespace-pre-line">
-            {recipe.notes}
-          </p>
-        </div>
-      )}
 
       {/* Ingredients + Steps */}
       <div className="grid gap-8 lg:grid-cols-[1fr_2fr]">
@@ -600,6 +649,16 @@ export function RecipeDetailPage() {
           </ol>
         </div>
       </div>
+
+      {/* Notes */}
+      {recipe.notes && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-5">
+          <h2 className="text-lg font-semibold text-stone-800 mb-2">Notes</h2>
+          <p className="text-sm text-stone-700 leading-relaxed whitespace-pre-line">
+            {recipe.notes}
+          </p>
+        </div>
+      )}
 
       {/* Delete dialog */}
       <CookPantryWizardDialog
