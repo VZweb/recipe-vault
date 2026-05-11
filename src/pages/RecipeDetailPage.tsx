@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate, Link, useLocation } from "react-router-dom";
 import {
   ArrowLeft,
   Check,
@@ -28,6 +28,7 @@ import {
   resolveMasterIngredient,
 } from "@/lib/ingredientRef";
 import { navigateToSuggestionsForIngredient, recipeLineSuggestionMaster } from "@/lib/suggestionsNavigation";
+import { RecipeScopeBadge } from "@/components/recipe/RecipeScopeBadge";
 import { Button } from "@/components/ui/Button";
 import { TagChip } from "@/components/ui/TagChip";
 import { CategoryIcon } from "@/components/ui/CategoryIcon";
@@ -38,11 +39,15 @@ import type { CookCountedReason } from "@/components/CookPantryWizardDialog";
 import type { PantryItem } from "@/types/pantry";
 import type { Ingredient } from "@/types/recipe";
 import { useIngredients } from "@/hooks/useIngredients";
+import { useAuth } from "@/contexts/AuthContext";
 
 export function RecipeDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { recipe, loading, error } = useRecipe(id);
+  const { pathname } = useLocation();
+  const recipeScope = /^\/shared\/[^/]+$/.test(pathname) ? "library" : "vault";
+  const { recipeLibraryAdmin } = useAuth();
+  const { recipe, loading, error } = useRecipe(id, recipeScope);
   const { tags } = useTags();
   const { categories } = useCategories();
   const { ingredients: masterIngredients } = useIngredients();
@@ -94,7 +99,7 @@ export function RecipeDetailPage() {
   const handleCountedCook = async (_reason: CookCountedReason) => {
     if (!recipe) return;
     setCookedCount((c) => c + 1);
-    await incrementCooked(recipe.id);
+    await incrementCooked(recipe.id, recipe.recipeScope);
     await loadPantry();
   };
 
@@ -103,7 +108,7 @@ export function RecipeDetailPage() {
     const prev = cookedCount;
     setCookedCount((c) => Math.max(0, c - 1));
     try {
-      await decrementCooked(recipe.id);
+      await decrementCooked(recipe.id, recipe.recipeScope);
     } catch {
       setCookedCount(prev);
     }
@@ -172,17 +177,42 @@ export function RecipeDetailPage() {
     );
   }
 
-  const recipeTags = tags.filter((t) => recipe.tags.includes(t.id));
-  const recipeCategory = categories.find((c) => c.id === recipe.categoryId);
+  const recipeTags =
+    recipe.recipeScope === "library"
+      ? []
+      : tags.filter((t) => recipe.tags.includes(t.id));
+  const libraryTagEntries =
+    recipe.recipeScope === "library"
+      ? (recipe.tagNames ?? []).map((name) => ({
+          name,
+          tag: tags.find((t) => t.name === name),
+        }))
+      : [];
+  const recipeCategory =
+    recipe.recipeScope === "library"
+      ? recipe.categoryName
+        ? categories.find((c) => c.name === recipe.categoryName)
+        : undefined
+      : categories.find((c) => c.id === recipe.categoryId);
   const totalTime =
     (recipe.prepTimeMin ?? 0) + (recipe.cookTimeMin ?? 0) || null;
 
   const handleDelete = async () => {
-    await remove(recipe.id);
+    await remove(recipe.id, recipe.recipeScope);
     navigate("/recipes");
   };
 
   const handleDuplicate = async () => {
+    const tagIds =
+      recipe.recipeScope === "library"
+        ? (recipe.tagNames ?? [])
+            .map((name) => tags.find((t) => t.name === name)?.id)
+            .filter((x): x is string => !!x)
+        : recipe.tags;
+    const categoryId =
+      recipe.recipeScope === "library"
+        ? categories.find((c) => c.name === recipe.categoryName)?.id ?? null
+        : recipe.categoryId;
     const newId = await create({
       title: `${recipe.title} (copy)`,
       description: recipe.description,
@@ -192,14 +222,19 @@ export function RecipeDetailPage() {
       sourceUrl: recipe.sourceUrl,
       videoUrl: recipe.videoUrl,
       imageUrls: recipe.imageUrls,
-      categoryId: recipe.categoryId,
-      tags: recipe.tags,
+      categoryId,
+      tags: tagIds,
       ingredients: recipe.ingredients,
       steps: recipe.steps,
       notes: recipe.notes,
     });
     navigate(`/recipes/${newId}`);
   };
+
+  const canEditLibrary =
+    recipe.recipeScope === "vault" || recipeLibraryAdmin === true;
+  const canDeleteRecipe =
+    recipe.recipeScope === "vault" || recipeLibraryAdmin === true;
 
   return (
     <div className="space-y-8">
@@ -272,27 +307,35 @@ export function RecipeDetailPage() {
                   <Copy size={16} className="shrink-0 text-stone-500" />
                   Duplicate
                 </button>
-                <Link
-                  to={`/recipes/${recipe.id}/edit`}
-                  role="menuitem"
-                  className="flex w-full items-center gap-2 px-3 py-2 text-sm text-stone-700 hover:bg-stone-50"
-                  onClick={() => setActionsMenuOpen(false)}
-                >
-                  <Edit size={16} className="shrink-0 text-stone-500" />
-                  Edit
-                </Link>
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
-                  onClick={() => {
-                    setActionsMenuOpen(false);
-                    setDeleteOpen(true);
-                  }}
-                >
-                  <Trash2 size={16} className="shrink-0" />
-                  Delete
-                </button>
+                {canEditLibrary && (
+                  <Link
+                    to={
+                      recipe.recipeScope === "library"
+                        ? `/shared/${recipe.id}/edit`
+                        : `/recipes/${recipe.id}/edit`
+                    }
+                    role="menuitem"
+                    className="flex w-full items-center gap-2 px-3 py-2 text-sm text-stone-700 hover:bg-stone-50"
+                    onClick={() => setActionsMenuOpen(false)}
+                  >
+                    <Edit size={16} className="shrink-0 text-stone-500" />
+                    Edit
+                  </Link>
+                )}
+                {canDeleteRecipe && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                    onClick={() => {
+                      setActionsMenuOpen(false);
+                      setDeleteOpen(true);
+                    }}
+                  >
+                    <Trash2 size={16} className="shrink-0" />
+                    Delete
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -335,7 +378,10 @@ export function RecipeDetailPage() {
 
       {/* Title + Meta */}
       <div>
-        <h1 className="font-heading text-3xl font-bold text-stone-900">{recipe.title}</h1>
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="font-heading text-3xl font-bold text-stone-900">{recipe.title}</h1>
+          <RecipeScopeBadge scope={recipe.recipeScope} variant="inline" />
+        </div>
         {recipe.description && (
           <p className="mt-2 text-stone-600">{recipe.description}</p>
         )}
@@ -370,7 +416,12 @@ export function RecipeDetailPage() {
           </span>
         </div>
 
-        {(recipeCategory || recipeTags.length > 0) && (
+        {(recipeCategory ||
+          recipeTags.length > 0 ||
+          libraryTagEntries.length > 0 ||
+          (recipe.recipeScope === "library" &&
+            recipe.categoryName &&
+            !recipeCategory)) && (
           <div className="mt-4 flex flex-wrap items-center gap-2">
             {recipeCategory && (
               <Link
@@ -381,11 +432,27 @@ export function RecipeDetailPage() {
                 {recipeCategory.name}
               </Link>
             )}
+            {recipe.recipeScope === "library" &&
+              recipe.categoryName &&
+              !recipeCategory && (
+                <span className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-stone-50 px-2.5 py-1 text-xs font-medium text-stone-600">
+                  {recipe.categoryName}
+                </span>
+              )}
             {recipeTags.map((tag) => (
               <Link key={tag.id} to={`/recipes?tag=${tag.id}`}>
                 <TagChip name={tag.name} color={tag.color} />
               </Link>
             ))}
+            {libraryTagEntries.map(({ name, tag: t }) =>
+              t ? (
+                <Link key={name} to={`/recipes?tag=${t.id}`}>
+                  <TagChip name={name} color={t.color} />
+                </Link>
+              ) : (
+                <TagChip key={name} name={name} color="#78716c" />
+              )
+            )}
           </div>
         )}
 

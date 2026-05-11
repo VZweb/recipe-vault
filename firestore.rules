@@ -12,6 +12,11 @@ service cloud.firestore {
       return signedIn() && request.auth.token.catalogAdmin == true;
     }
 
+    /** Set via Admin SDK: `node scripts/set-recipe-library-admin-claim.mjs --uid=...` */
+    function isRecipeLibraryAdmin() {
+      return signedIn() && request.auth.token.recipeLibraryAdmin == true;
+    }
+
     match /users/{userId} {
       allow read, create, update, delete: if signedIn() && request.auth.uid == userId;
     }
@@ -34,6 +39,15 @@ service cloud.firestore {
 
     match /users/{userId}/customIngredients/{ingredientId} {
       allow read, create, update, delete: if signedIn() && request.auth.uid == userId;
+    }
+
+    match /users/{userId}/libraryRecipeProgress/{recipeId} {
+      allow read, write: if signedIn() && request.auth.uid == userId;
+    }
+
+    match /sharedRecipes/{recipeId} {
+      allow read: if signedIn();
+      allow create, update, delete: if signedIn() && isRecipeLibraryAdmin();
     }
 
     // TODO: tighten if you add moderation tools — for now only catalogAdmin may write.

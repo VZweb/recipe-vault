@@ -47,3 +47,16 @@ export function getIngredientCatalogCollection(
 ): CollectionReference {
   return collection(db, "ingredientCatalog");
 }
+
+/** Shared recipe library — one document per recipe, visible to all signed-in users. */
+export function getSharedRecipesCollection(db: Firestore): CollectionReference {
+  return collection(db, "sharedRecipes");
+}
+
+/** Per-user cooked counts etc. for shared library recipes (`sharedRecipes` ids). */
+export function getUserLibraryRecipeProgressCollection(
+  db: Firestore,
+  uid: string
+): CollectionReference {
+  return collection(db, "users", uid, "libraryRecipeProgress");
+}

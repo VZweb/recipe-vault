@@ -27,8 +27,12 @@ export interface Step {
   sortOrder: number;
 }
 
+export type RecipeScope = "vault" | "library";
+
 export interface Recipe {
   id: string;
+  /** Vault recipes use tag/category doc ids; library recipes use denormalized labels. */
+  recipeScope: RecipeScope;
   title: string;
   description: string;
   servings: number | null;
@@ -39,6 +43,10 @@ export interface Recipe {
   imageUrls: string[];
   categoryId: string | null;
   tags: string[];
+  /** When `recipeScope === "library"`: display/filter labels (shared across accounts). */
+  tagNames?: string[];
+  /** When `recipeScope === "library"`: category display name. */
+  categoryName?: string | null;
   ingredients: Ingredient[];
   steps: Step[];
   notes: string;
@@ -47,4 +55,7 @@ export interface Recipe {
   updatedAt: Date;
 }
 
-export type RecipeFormData = Omit<Recipe, "id" | "createdAt" | "updatedAt" | "cookedCount">;
+export type RecipeFormData = Omit<
+  Recipe,
+  "id" | "createdAt" | "updatedAt" | "cookedCount" | "recipeScope" | "tagNames" | "categoryName"
+>;

@@ -24,6 +24,8 @@ export function App() {
           <Route path="recipes/new" element={<RecipeEditorPage />} />
           <Route path="recipes/:id" element={<RecipeDetailPage />} />
           <Route path="recipes/:id/edit" element={<RecipeEditorPage />} />
+          <Route path="shared/:id" element={<RecipeDetailPage />} />
+          <Route path="shared/:id/edit" element={<RecipeEditorPage />} />
           <Route path="organize" element={<OrganizePage />} />
           <Route path="categories" element={<Navigate to="/organize" replace />} />
           <Route path="tags" element={<Navigate to="/organize?tab=tags" replace />} />

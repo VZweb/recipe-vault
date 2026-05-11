@@ -8,6 +8,7 @@ import { useIngredients } from "@/hooks/useIngredients";
 import { fetchPantryItems } from "@/lib/firestore";
 import { suggestRecipes, type SuggestionResult } from "@/lib/suggestions";
 import { Button } from "@/components/ui/Button";
+import { RecipeScopeBadge } from "@/components/recipe/RecipeScopeBadge";
 import { TagChip } from "@/components/ui/TagChip";
 import { Spinner } from "@/components/ui/Spinner";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -542,14 +543,23 @@ function SuggestionCard({
   tags: { id: string; name: string; color: string }[];
   matchedExtras: string[];
 }) {
-  const recipeTags = allTags.filter((t) => s.recipe.tags.includes(t.id));
+  const recipeTags =
+    s.recipe.recipeScope === "library"
+      ? []
+      : allTags.filter((t) => s.recipe.tags.includes(t.id));
+  const libraryTagNames =
+    s.recipe.recipeScope === "library" ? s.recipe.tagNames ?? [] : [];
   const totalTime =
     (s.recipe.prepTimeMin ?? 0) + (s.recipe.cookTimeMin ?? 0) || null;
   const highlighted = matchedExtras.length > 0;
 
   return (
     <Link
-      to={`/recipes/${s.recipe.id}`}
+      to={
+        s.recipe.recipeScope === "library"
+          ? `/shared/${s.recipe.id}`
+          : `/recipes/${s.recipe.id}`
+      }
       className={`flex gap-4 rounded-xl border p-4 shadow-sm hover:shadow-md transition-shadow ${
         highlighted
           ? "border-brand-300 bg-brand-50/40 ring-1 ring-brand-200"
@@ -574,9 +584,12 @@ function SuggestionCard({
       {/* Content */}
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
-          <h3 className="font-heading font-semibold text-stone-900 line-clamp-2 sm:truncate">
-            {s.recipe.title}
-          </h3>
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+            <h3 className="font-heading font-semibold text-stone-900 line-clamp-2 sm:truncate">
+              {s.recipe.title}
+            </h3>
+            <RecipeScopeBadge scope={s.recipe.recipeScope} variant="inline" />
+          </div>
           <span
             className={`flex-shrink-0 flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold ${
               s.matchPercentage >= 80
@@ -624,6 +637,9 @@ function SuggestionCard({
           )}
           {recipeTags.slice(0, 2).map((tag) => (
             <TagChip key={tag.id} name={tag.name} color={tag.color} />
+          ))}
+          {libraryTagNames.slice(0, 2).map((name) => (
+            <TagChip key={name} name={name} color="#78716c" />
           ))}
         </div>
       </div>

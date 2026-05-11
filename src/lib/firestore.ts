@@ -20,16 +20,18 @@ import { DEFAULT_CATEGORIES, DEFAULT_TAGS } from "@/data/defaultVaultTemplates";
 import { db, refreshAuthIdToken, requireUid } from "./firebase";
 import { deleteRecipeImage, deletePantryImage } from "./storage";
 import type { MasterIngredientScope } from "@/types/ingredientRef";
-import type { Recipe, RecipeFormData } from "@/types/recipe";
+import type { Recipe, RecipeFormData, RecipeScope } from "@/types/recipe";
 import type { Tag } from "@/types/tag";
 import type { Category } from "@/types/category";
 import type { PantryItem } from "@/types/pantry";
 import type { MasterIngredient } from "@/types/ingredient";
 import {
   getIngredientCatalogCollection,
+  getSharedRecipesCollection,
   getUserCategoriesCollection,
   getUserCustomIngredientsCollection,
   getUserDocRef,
+  getUserLibraryRecipeProgressCollection,
   getUserPantryCollection,
   getUserRecipesCollection,
   getUserTagsCollection,
@@ -70,6 +72,7 @@ function normalizeSubstituteLinks(raw: unknown): {
 function docToRecipe(id: string, data: DocumentData): Recipe {
   return {
     id,
+    recipeScope: "vault",
     title: data.title ?? "",
     description: data.description ?? "",
     servings: data.servings ?? null,
@@ -79,7 +82,7 @@ function docToRecipe(id: string, data: DocumentData): Recipe {
     videoUrl: data.videoUrl ?? "",
     imageUrls: data.imageUrls ?? [],
     categoryId: data.categoryId ?? null,
-    tags: data.tags ?? [],
+    tags: Array.isArray(data.tags) ? data.tags : [],
     ingredients: (data.ingredients ?? []).map((ing: Record<string, unknown>) => ({
       ...ing,
       nameSecondary: ing.nameSecondary ?? "",
@@ -92,6 +95,59 @@ function docToRecipe(id: string, data: DocumentData): Recipe {
     steps: data.steps ?? [],
     notes: data.notes ?? "",
     cookedCount: data.cookedCount ?? 0,
+    createdAt: toDate(data.createdAt),
+    updatedAt: toDate(data.updatedAt),
+  };
+}
+
+function normalizeTagNames(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const out: string[] = [];
+  for (const x of raw) {
+    if (typeof x === "string" && x.trim()) out.push(x.trim());
+  }
+  return out;
+}
+
+export function docToLibraryRecipe(
+  id: string,
+  data: DocumentData,
+  cookedCount: number
+): Recipe {
+  const tagNames = normalizeTagNames(data.tagNames);
+  const categoryNameRaw = data.categoryName;
+  const categoryName =
+    typeof categoryNameRaw === "string" && categoryNameRaw.trim()
+      ? categoryNameRaw.trim()
+      : null;
+
+  return {
+    id,
+    recipeScope: "library",
+    title: data.title ?? "",
+    description: data.description ?? "",
+    servings: data.servings ?? null,
+    prepTimeMin: data.prepTimeMin ?? null,
+    cookTimeMin: data.cookTimeMin ?? null,
+    sourceUrl: data.sourceUrl ?? "",
+    videoUrl: data.videoUrl ?? "",
+    imageUrls: data.imageUrls ?? [],
+    categoryId: null,
+    tags: [],
+    tagNames,
+    categoryName,
+    ingredients: (data.ingredients ?? []).map((ing: Record<string, unknown>) => ({
+      ...ing,
+      nameSecondary: ing.nameSecondary ?? "",
+      masterIngredientId: ing.masterIngredientId ?? null,
+      masterIngredientScope: normalizeIngredientScope(ing.masterIngredientScope),
+      substituteLinks: normalizeSubstituteLinks(ing.substituteLinks),
+      note: (ing.note as string) ?? "",
+      isSection: (ing.isSection as boolean) ?? false,
+    })),
+    steps: data.steps ?? [],
+    notes: data.notes ?? "",
+    cookedCount,
     createdAt: toDate(data.createdAt),
     updatedAt: toDate(data.updatedAt),
   };
@@ -166,19 +222,16 @@ function docToCustomIngredient(id: string, data: DocumentData): MasterIngredient
 
 // --- Recipes ---
 
-export async function fetchRecipes(
+async function fetchVaultRecipes(
+  uid: string,
   tagIds?: string[],
   categoryId?: string
 ): Promise<Recipe[]> {
-  const uid = requireUid();
   const recipesCol = getUserRecipesCollection(db, uid);
   let q;
 
   if (tagIds && tagIds.length > 0) {
-    q = query(
-      recipesCol,
-      where("tags", "array-contains", tagIds[0])
-    );
+    q = query(recipesCol, where("tags", "array-contains", tagIds[0]));
   } else if (categoryId) {
     q = query(recipesCol, where("categoryId", "==", categoryId));
   } else {
@@ -189,9 +242,7 @@ export async function fetchRecipes(
   let recipes = snap.docs.map((d) => docToRecipe(d.id, d.data()));
 
   if (tagIds && tagIds.length > 1) {
-    recipes = recipes.filter((r) =>
-      tagIds.every((id) => r.tags.includes(id))
-    );
+    recipes = recipes.filter((r) => tagIds.every((id) => r.tags.includes(id)));
   }
 
   if (categoryId && tagIds && tagIds.length > 0) {
@@ -203,11 +254,90 @@ export async function fetchRecipes(
   return recipes;
 }
 
+export async function fetchRecipes(
+  tagIds?: string[],
+  categoryId?: string
+): Promise<Recipe[]> {
+  const uid = requireUid();
+  const [tagsList, categoriesList, vaultRecipes, sharedSnap, progressSnap] =
+    await Promise.all([
+      fetchTags(),
+      fetchCategories(),
+      fetchVaultRecipes(uid, tagIds, categoryId),
+      getDocs(query(getSharedRecipesCollection(db), orderBy("createdAt", "desc"))),
+      getDocs(getUserLibraryRecipeProgressCollection(db, uid)),
+    ]);
+
+  const progressMap = new Map<string, number>();
+  for (const d of progressSnap.docs) {
+    const raw = d.data().cookedCount;
+    progressMap.set(
+      d.id,
+      typeof raw === "number" && Number.isFinite(raw) ? raw : 0
+    );
+  }
+
+  const tagNameFilters =
+    tagIds && tagIds.length > 0
+      ? tagIds
+          .map((id) => tagsList.find((t) => t.id === id)?.name)
+          .filter((n): n is string => !!n)
+      : undefined;
+
+  const categoryNameFilter = categoryId
+    ? categoriesList.find((c) => c.id === categoryId)?.name ?? null
+    : null;
+
+  let libraryRecipes = sharedSnap.docs.map((d) =>
+    docToLibraryRecipe(d.id, d.data(), progressMap.get(d.id) ?? 0)
+  );
+
+  if (tagNameFilters && tagNameFilters.length > 0) {
+    libraryRecipes = libraryRecipes.filter((r) =>
+      tagNameFilters.every((n) => (r.tagNames ?? []).includes(n))
+    );
+  }
+  if (categoryId && categoryNameFilter) {
+    libraryRecipes = libraryRecipes.filter(
+      (r) => r.categoryName === categoryNameFilter
+    );
+  }
+
+  const merged = [...vaultRecipes, ...libraryRecipes];
+  merged.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  return merged;
+}
+
 export async function fetchRecipe(id: string): Promise<Recipe | null> {
   const uid = requireUid();
   const snap = await getDoc(doc(getUserRecipesCollection(db, uid), id));
   if (!snap.exists()) return null;
   return docToRecipe(snap.id, snap.data());
+}
+
+export async function fetchLibraryRecipe(id: string): Promise<Recipe | null> {
+  requireUid();
+  const snap = await getDoc(doc(getSharedRecipesCollection(db), id));
+  if (!snap.exists()) return null;
+  const uid = requireUid();
+  const progSnap = await getDoc(
+    doc(getUserLibraryRecipeProgressCollection(db, uid), id)
+  );
+  const cooked =
+    progSnap.exists() &&
+    typeof progSnap.data().cookedCount === "number" &&
+    Number.isFinite(progSnap.data().cookedCount)
+      ? progSnap.data().cookedCount
+      : 0;
+  return docToLibraryRecipe(id, snap.data(), cooked);
+}
+
+export async function fetchRecipeForScope(
+  id: string,
+  scope: RecipeScope
+): Promise<Recipe | null> {
+  if (scope === "library") return fetchLibraryRecipe(id);
+  return fetchRecipe(id);
 }
 
 export async function createRecipe(data: RecipeFormData): Promise<string> {
@@ -242,7 +372,116 @@ export async function deleteRecipe(id: string): Promise<void> {
   }
 }
 
-export async function incrementCookedCount(id: string): Promise<void> {
+export async function createSharedRecipe(
+  data: RecipeFormData,
+  tagNames: string[],
+  categoryName: string | null,
+  predeterminedId?: string
+): Promise<string> {
+  requireUid();
+  await refreshAuthIdToken();
+  const now = Timestamp.now();
+  const payload = {
+    title: data.title,
+    description: data.description,
+    servings: data.servings,
+    prepTimeMin: data.prepTimeMin,
+    cookTimeMin: data.cookTimeMin,
+    sourceUrl: data.sourceUrl,
+    videoUrl: data.videoUrl,
+    imageUrls: data.imageUrls,
+    ingredients: data.ingredients,
+    steps: data.steps,
+    notes: data.notes,
+    tagNames,
+    categoryName,
+    createdAt: now,
+    updatedAt: now,
+  };
+  const col = getSharedRecipesCollection(db);
+  if (predeterminedId) {
+    await setDoc(doc(col, predeterminedId), payload);
+    return predeterminedId;
+  }
+  const docRef = await addDoc(col, payload);
+  return docRef.id;
+}
+
+export async function updateSharedRecipe(
+  id: string,
+  data: Partial<RecipeFormData>,
+  tagNames?: string[],
+  categoryName?: string | null
+): Promise<void> {
+  requireUid();
+  await refreshAuthIdToken();
+  const payload: Record<string, unknown> = {
+    updatedAt: Timestamp.now(),
+  };
+  const keys: (keyof RecipeFormData)[] = [
+    "title",
+    "description",
+    "servings",
+    "prepTimeMin",
+    "cookTimeMin",
+    "sourceUrl",
+    "videoUrl",
+    "imageUrls",
+    "ingredients",
+    "steps",
+    "notes",
+  ];
+  for (const k of keys) {
+    if (k in data && data[k] !== undefined) {
+      payload[k] = data[k];
+    }
+  }
+  if (tagNames !== undefined) payload.tagNames = tagNames;
+  if (categoryName !== undefined) payload.categoryName = categoryName;
+  await updateDoc(
+    doc(getSharedRecipesCollection(db), id),
+    payload as DocumentData
+  );
+}
+
+export async function deleteSharedRecipe(id: string): Promise<void> {
+  const recipe = await fetchLibraryRecipe(id);
+  const uid = requireUid();
+  await refreshAuthIdToken();
+  await deleteDoc(doc(getSharedRecipesCollection(db), id));
+  try {
+    await deleteDoc(doc(getUserLibraryRecipeProgressCollection(db, uid), id));
+  } catch {
+    // optional doc
+  }
+  if (recipe?.imageUrls.length) {
+    await Promise.allSettled(recipe.imageUrls.map(deleteRecipeImage));
+  }
+}
+
+export async function incrementCookedCount(
+  id: string,
+  scope: RecipeScope = "vault"
+): Promise<void> {
+  if (scope === "library") {
+    const uid = requireUid();
+    const ref = doc(getUserLibraryRecipeProgressCollection(db, uid), id);
+    await runTransaction(db, async (transaction) => {
+      const snap = await transaction.get(ref);
+      const cur =
+        snap.exists() &&
+        typeof snap.data().cookedCount === "number" &&
+        Number.isFinite(snap.data().cookedCount)
+          ? snap.data().cookedCount
+          : 0;
+      transaction.set(
+        ref,
+        { cookedCount: cur + 1, updatedAt: Timestamp.now() },
+        { merge: true }
+      );
+    });
+    return;
+  }
   const uid = requireUid();
   await updateDoc(doc(getUserRecipesCollection(db, uid), id), {
     cookedCount: increment(1),
@@ -251,7 +490,26 @@ export async function incrementCookedCount(id: string): Promise<void> {
 }
 
 /** Does nothing if cookedCount is already 0 (no negative counts). */
-export async function decrementCookedCount(id: string): Promise<void> {
+export async function decrementCookedCount(
+  id: string,
+  scope: RecipeScope = "vault"
+): Promise<void> {
+  if (scope === "library") {
+    const uid = requireUid();
+    const ref = doc(getUserLibraryRecipeProgressCollection(db, uid), id);
+    await runTransaction(db, async (transaction) => {
+      const snap = await transaction.get(ref);
+      if (!snap.exists()) return;
+      const raw = snap.data().cookedCount;
+      const current = typeof raw === "number" && Number.isFinite(raw) ? raw : 0;
+      if (current <= 0) return;
+      transaction.update(ref, {
+        cookedCount: current - 1,
+        updatedAt: Timestamp.now(),
+      });
+    });
+    return;
+  }
   const uid = requireUid();
   const ref = doc(getUserRecipesCollection(db, uid), id);
   await runTransaction(db, async (transaction) => {

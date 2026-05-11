@@ -1,5 +1,5 @@
-import { useEffect, useLayoutEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { AlertTriangle, ArrowLeft, ChevronDown, ChevronUp, ClipboardPaste, ImagePlus, LayoutList, Link, Link2, MessageSquare, Plus, Sparkles, Trash2, X } from "lucide-react";
 import { parseIngredientText } from "@/lib/parseIngredients";
 import { parseStepsText } from "@/lib/parseSteps";
@@ -24,6 +24,7 @@ import {
   resolveMasterIngredient,
 } from "@/lib/ingredientRef";
 import { navigateToSuggestionsForIngredient, recipeLineSuggestionMaster } from "@/lib/suggestionsNavigation";
+import { useAuth } from "@/contexts/AuthContext";
 
 function emptyIngredient(sortOrder: number): Ingredient {
   return {
@@ -77,13 +78,31 @@ const defaultForm: RecipeFormData = {
 
 export function RecipeEditorPage() {
   const { id } = useParams<{ id: string }>();
-  const isEditing = !!id;
+  const { pathname } = useLocation();
+  const isLibraryEdit = /^\/shared\/[^/]+\/edit$/.test(pathname);
+  const recipeScope = isLibraryEdit ? "library" : "vault";
+  const isEditing = Boolean(id);
   const navigate = useNavigate();
-  const { recipe, loading: loadingRecipe } = useRecipe(id);
+  const { recipeLibraryAdmin, refreshClaims } = useAuth();
+  const libraryDraftIdRef = useRef<string>("");
+  if (!libraryDraftIdRef.current) {
+    libraryDraftIdRef.current =
+      typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : Math.random().toString(36).slice(2);
+  }
+
+  const [saveToSharedLibrary, setSaveToSharedLibrary] = useState(false);
+  const isNewShared =
+    Boolean(recipeLibraryAdmin) && !isEditing && saveToSharedLibrary;
+  const libraryImageTarget =
+    isLibraryEdit && id ? id : isNewShared ? libraryDraftIdRef.current : undefined;
+
+  const { recipe, loading: loadingRecipe } = useRecipe(id, recipeScope);
   const { tags } = useTags();
   const { categories } = useCategories();
-  const { create, update } = useRecipeMutations();
-  const { upload, uploading } = useImageUpload();
+  const { create, createShared, update } = useRecipeMutations();
+  const { upload, uploading } = useImageUpload(libraryImageTarget);
   const { ingredients: masterIngredients, add: addCatalogIngredient } = useIngredients();
 
   const [form, setForm] = useState<RecipeFormData>(defaultForm);
@@ -107,6 +126,11 @@ export function RecipeEditorPage() {
     if (substitutePickerIdx === null) setSubstitutePickerQuery("");
   }, [substitutePickerIdx]);
 
+  /** Pick up custom claims (e.g. recipeLibraryAdmin) after they are granted without requiring sign-out. */
+  useEffect(() => {
+    if (pathname.endsWith("/recipes/new")) void refreshClaims();
+  }, [pathname, refreshClaims]);
+
   /** Scroll to top when the editor replaces the loading state (avoids mid-page viewport). */
   useLayoutEffect(() => {
     if (isEditing && id && !loadingRecipe) {
@@ -115,7 +139,9 @@ export function RecipeEditorPage() {
   }, [isEditing, id, loadingRecipe]);
 
   useEffect(() => {
-    if (recipe && isEditing) {
+    if (!recipe || !isEditing) return;
+
+    if (recipe.recipeScope === "library") {
       setForm({
         title: recipe.title,
         description: recipe.description,
@@ -125,8 +151,11 @@ export function RecipeEditorPage() {
         sourceUrl: recipe.sourceUrl,
         videoUrl: recipe.videoUrl,
         imageUrls: recipe.imageUrls,
-        categoryId: recipe.categoryId,
-        tags: recipe.tags,
+        categoryId:
+          categories.find((c) => c.name === recipe.categoryName)?.id ?? null,
+        tags: (recipe.tagNames ?? [])
+          .map((name) => tags.find((t) => t.name === name)?.id)
+          .filter((x): x is string => !!x),
         ingredients:
           recipe.ingredients.length > 0
             ? recipe.ingredients
@@ -137,10 +166,39 @@ export function RecipeEditorPage() {
       setPreviewImages(recipe.imageUrls);
       const ings = recipe.ingredients.length > 0 ? recipe.ingredients : [];
       const openNotes = new Set<number>();
-      ings.forEach((ing, i) => { if (ing.note) openNotes.add(i); });
+      ings.forEach((ing, i) => {
+        if (ing.note) openNotes.add(i);
+      });
       setNoteOpenSet(openNotes);
+      return;
     }
-  }, [recipe, isEditing]);
+
+    setForm({
+      title: recipe.title,
+      description: recipe.description,
+      servings: recipe.servings,
+      prepTimeMin: recipe.prepTimeMin,
+      cookTimeMin: recipe.cookTimeMin,
+      sourceUrl: recipe.sourceUrl,
+      videoUrl: recipe.videoUrl,
+      imageUrls: recipe.imageUrls,
+      categoryId: recipe.categoryId,
+      tags: recipe.tags,
+      ingredients:
+        recipe.ingredients.length > 0
+          ? recipe.ingredients
+          : [emptyIngredient(0)],
+      steps: recipe.steps.length > 0 ? recipe.steps : [emptyStep(0)],
+      notes: recipe.notes,
+    });
+    setPreviewImages(recipe.imageUrls);
+    const ings = recipe.ingredients.length > 0 ? recipe.ingredients : [];
+    const openNotes = new Set<number>();
+    ings.forEach((ing, i) => {
+      if (ing.note) openNotes.add(i);
+    });
+    setNoteOpenSet(openNotes);
+  }, [recipe, isEditing, tags, categories]);
 
   const setField = <K extends keyof RecipeFormData>(
     key: K,
@@ -364,7 +422,29 @@ export function RecipeEditorPage() {
         steps: cleanedSteps,
       };
 
-      if (isEditing && id) {
+      const tagNames = form.tags
+        .map((tid) => tags.find((t) => t.id === tid)?.name)
+        .filter((n): n is string => !!n);
+      const categoryName = form.categoryId
+        ? categories.find((c) => c.id === form.categoryId)?.name ?? null
+        : null;
+
+      if (isLibraryEdit && id) {
+        await update(id, data, {
+          scope: "library",
+          tagNames,
+          categoryName,
+        });
+        navigate(`/shared/${id}`);
+      } else if (isNewShared) {
+        const newId = await createShared(
+          data,
+          tagNames,
+          categoryName,
+          libraryDraftIdRef.current
+        );
+        navigate(`/shared/${newId}`);
+      } else if (isEditing && id) {
         await update(id, data);
         navigate(`/recipes/${id}`);
       } else {
@@ -397,12 +477,44 @@ export function RecipeEditorPage() {
           Back
         </button>
         <h1 className="font-heading text-xl font-bold text-stone-800">
-          {isEditing ? "Edit Recipe" : "New Recipe"}
+          {isLibraryEdit
+            ? "Edit shared recipe"
+            : isEditing
+              ? "Edit Recipe"
+              : "New Recipe"}
         </h1>
         <Button type="submit" disabled={saving || !form.title.trim()}>
           {saving ? <Spinner /> : isEditing ? "Save" : "Create"}
         </Button>
       </div>
+
+      {recipeLibraryAdmin && !isEditing && (
+        <section className="rounded-xl border border-brand-200 bg-brand-50/40 p-4">
+          <p className="text-sm font-medium text-stone-800 mb-2">Save location</p>
+          <div className="flex flex-col gap-2 sm:flex-row sm:gap-6">
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-stone-700">
+              <input
+                type="radio"
+                name="saveTarget"
+                checked={!saveToSharedLibrary}
+                onChange={() => setSaveToSharedLibrary(false)}
+                className="text-brand-600 focus:ring-brand-500"
+              />
+              My recipes (private)
+            </label>
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-stone-700">
+              <input
+                type="radio"
+                name="saveTarget"
+                checked={saveToSharedLibrary}
+                onChange={() => setSaveToSharedLibrary(true)}
+                className="text-brand-600 focus:ring-brand-500"
+              />
+              Shared library (visible to all accounts)
+            </label>
+          </div>
+        </section>
+      )}
 
       {/* Basic info */}
       <section className="space-y-4 rounded-xl border border-stone-200 bg-white p-6">

@@ -28,10 +28,14 @@ Path helpers live in `src/lib/firestorePaths.ts`; reads/writes are implemented i
 | `ingredientCatalog` | Shared master ingredients | `orderBy("name")` |
 | `users/{uid}/customIngredients` | User-created master ingredients | `orderBy("name")` |
 | `users/{uid}` | User profile / flags | Document used for `vaultDefaultsApplied` etc. |
+| `sharedRecipes` | Shared recipe library (all accounts) | `orderBy("createdAt","desc")`; documents use **`tagNames`** (strings) and **`categoryName`** instead of per-user tag/category ids |
+| `users/{uid}/libraryRecipeProgress` | Per-user stats for shared recipes | Document id = `sharedRecipes` doc id; e.g. **`cookedCount`** (vault recipes keep `cookedCount` on the recipe doc) |
 
 ### Recipe documents
 
-Recipes store arrays of ingredient lines (with optional `masterIngredientId` + `masterIngredientScope`: `catalog` | `custom` | null for legacy, plus optional **`substituteLinks`**: array of `{ masterIngredientId, masterIngredientScope }` for other masters that satisfy the same line for pantry matching and suggestions), steps, optional `categoryId`, `tags` (array of tag document IDs), `imageUrls`, timestamps (`createdAt`, `updatedAt`), and `cookedCount`. Bumping the count uses `incrementCookedCount` (atomic `increment(1)`); lowering it uses `decrementCookedCount` (transaction, no-op at 0). `docToRecipe` normalizes missing fields when reading (including default `substituteLinks: []`). The recipe list’s **multi-tag filter** is **AND**: `fetchRecipes` uses `array-contains` on the first tag id, then filters the rest in memory.
+**Vault (`users/{uid}/recipes`):** Arrays of ingredient lines (with optional `masterIngredientId` + `masterIngredientScope`: `catalog` | `custom` | null for legacy, plus optional **`substituteLinks`**: array of `{ masterIngredientId, masterIngredientScope }` for other masters that satisfy the same line for pantry matching and suggestions), steps, optional `categoryId`, `tags` (array of tag document IDs), `imageUrls`, timestamps (`createdAt`, `updatedAt`), and `cookedCount`. Bumping the count uses `incrementCookedCount` (atomic `increment(1)`); lowering it uses `decrementCookedCount` (transaction, no-op at 0). `docToRecipe` normalizes missing fields when reading (including default `substituteLinks: []`). The recipe list’s **multi-tag filter** is **AND**: `fetchRecipes` uses `array-contains` on the first tag id, then filters the rest in memory.
+
+**Shared library (`sharedRecipes`):** Same core fields as vault recipes except **`tagNames`** (string array) and **`categoryName`** (string or null) replace `tags` and `categoryId` so all users see consistent labels. The list view merges vault + library recipes. **Cooked count** for library items is read/written under **`users/{uid}/libraryRecipeProgress`**, not on the shared document. UI routes: [`/shared/:id`](../src/pages/RecipeDetailPage.tsx) and [`/shared/:id/edit`](../src/pages/RecipeEditorPage.tsx) (library admin only for edits).
 
 **Alternatives UX:** Users edit `substituteLinks` in [`RecipeEditorPage`](../src/pages/RecipeEditorPage.tsx) (inside each ingredient card). [`RecipeDetailPage`](../src/pages/RecipeDetailPage.tsx) shows linked alternatives read-only under the line name. Behavior and matching rules are described in [Domain logic — Recipe ingredient alternatives (substituteLinks)](./domain-logic.md#recipe-ingredient-alternatives-substitutelinks).
 
@@ -76,7 +80,8 @@ Canonical shapes are in `src/types/` (`recipe.ts`, `tag.ts`, `category.ts`, `pan
 
 Implemented in `src/lib/storage.ts`:
 
-- Recipe images: `recipes/{uid}/files/{timestamp-random}.{ext}`
+- Vault recipe images: `recipes/{uid}/files/{timestamp-random}.{ext}`
+- Shared library recipe images: `recipes/library/{recipeId}/files/{timestamp-random}.{ext}`
 - Pantry images: `pantry/{uid}/{itemId}/{timestamp-random}.{ext}`
 
 Download URLs are stored on documents (`imageUrls` on recipes, `imageUrl` on pantry items).
@@ -90,3 +95,4 @@ Download URLs are stored on documents (`imageUrls` on recipes, `imageUrl` on pan
 - **Move legacy top-level collections into `users/{uid}` and split ingredients:** `node scripts/migrate-to-user-scoped-firestore.mjs [--dry-run]` (service account). Run in a dev project first; then deploy this app version and updated `firestore.rules`.
 - **Legacy helpers (old top-level `ingredients` / `ownerId` model):** `scripts/backfill-ingredients-catalog.mjs`, `scripts/backfill-vault-owner.mjs` — kept for reference only after migration.
 - **Recipe import:** `scripts/import-recipes.mjs` requires `--owner-uid=` for writes; it targets `users/{uid}/recipes` and `users/{uid}/tags`.
+- **Vault → shared library:** `node scripts/migrate-vault-to-shared-recipes.mjs --source-uid=UID` copies vault recipes into `sharedRecipes` with denormalized tags/categories (see script `--help`). Re-upload images via the app if you need them under `recipes/library/...`.

@@ -31,6 +31,9 @@ These scripts expect a service account JSON at `scripts/service-account.json` or
 |--------|---------|
 | `node scripts/migrate-to-user-scoped-firestore.mjs [--dry-run]` | Copy legacy top-level vault + `ingredients` + `userProfiles` into `users/{uid}/…`, `ingredientCatalog`, and backfill `masterIngredientScope`. Run in dev/staging first. |
 | `node scripts/set-catalog-admin-claim.mjs --uid=FIREBASE_AUTH_UID` | Set custom claim `catalogAdmin` so that user may edit `ingredientCatalog` from the app (`--revoke` removes the claim). |
+| `node scripts/set-recipe-library-admin-claim.mjs --uid=FIREBASE_AUTH_UID` | Set custom claim `recipeLibraryAdmin` so that user may create/update/delete `sharedRecipes` and upload to `recipes/library/...` in Storage (`--revoke` removes the claim). |
+| `node scripts/migrate-vault-to-shared-recipes.mjs --source-uid=FIREBASE_UID [--dry-run] [--overwrite]` | Copy `users/{uid}/recipes` into `sharedRecipes` with denormalized `tagNames` / `categoryName` (service account). Does not move Storage images. |
+| `node scripts/delete-user-vault-recipes.mjs --uid=FIREBASE_UID [--dry-run]` | Delete **all** documents under `users/{uid}/recipes` only (`sharedRecipes` untouched). Does not delete Storage files under `recipes/{uid}/…`. |
 | `node scripts/backfill-ingredients-catalog.mjs` | **Legacy only:** old top-level `ingredients` collection. Prefer the migrate script for current layout. |
 | `node scripts/backfill-vault-owner.mjs --owner-uid=FIREBASE_UID` | **Legacy only:** set `ownerId` on old top-level vault docs. |
 | `node scripts/export-user-vault-templates.mjs --uid=FIREBASE_UID [--write]` | Dump that user’s `users/{uid}/tags` and `users/{uid}/categories` as TypeScript for `src/data/defaultVaultTemplates.ts` (`--write` overwrites the file; omits tag names containing U+FFFD from bad imports). |

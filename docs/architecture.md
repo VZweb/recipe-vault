@@ -21,6 +21,8 @@ Routes live in `src/App.tsx`. Unauthenticated visitors are redirected to **`/log
 | `/recipes/new` | `RecipeEditorPage` | Create |
 | `/recipes/:id` | `RecipeDetailPage` | |
 | `/recipes/:id/edit` | `RecipeEditorPage` | Edit |
+| `/shared/:id` | `RecipeDetailPage` | Shared library recipe (merged into `/recipes` list) |
+| `/shared/:id/edit` | `RecipeEditorPage` | Edit shared recipe (`recipeLibraryAdmin` only) |
 | `/organize` | `OrganizePage` | Tabs: categories (default), tags (`?tab=tags`) |
 | `/categories` | — | Redirects to `/organize` |
 | `/tags` | — | Redirects to `/organize?tab=tags` |

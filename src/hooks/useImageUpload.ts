@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { uploadRecipeImage } from "@/lib/storage";
+import { uploadLibraryRecipeImage, uploadRecipeImage } from "@/lib/storage";
 
-export function useImageUpload() {
+export function useImageUpload(libraryRecipeId?: string | null) {
   const { user } = useAuth();
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -13,7 +13,10 @@ export function useImageUpload() {
     setProgress(0);
     try {
       setProgress(50);
-      const url = await uploadRecipeImage(user.uid, file);
+      const url =
+        libraryRecipeId != null && libraryRecipeId !== ""
+          ? await uploadLibraryRecipeImage(libraryRecipeId, file)
+          : await uploadRecipeImage(user.uid, file);
       setProgress(100);
       return url;
     } finally {

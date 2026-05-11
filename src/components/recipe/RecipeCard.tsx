@@ -1,9 +1,10 @@
 import { Link, useNavigate } from "react-router-dom";
 import { ChefHat, Clock, Users } from "lucide-react";
 import type { Recipe } from "@/types/recipe";
+import { RecipeScopeBadge } from "@/components/recipe/RecipeScopeBadge";
+import { TagChip } from "@/components/ui/TagChip";
 import type { Tag } from "@/types/tag";
 import type { Category } from "@/types/category";
-import { TagChip } from "@/components/ui/TagChip";
 import { CategoryIcon } from "@/components/ui/CategoryIcon";
 
 interface RecipeCardProps {
@@ -17,16 +18,37 @@ export function RecipeCard({ recipe, tags, categories = [] }: RecipeCardProps) {
   const totalTime =
     (recipe.prepTimeMin ?? 0) + (recipe.cookTimeMin ?? 0) || null;
 
-  const recipeTags = tags.filter((t) => recipe.tags.includes(t.id));
-  const category = categories.find((c) => c.id === recipe.categoryId);
+  const recipeLink =
+    recipe.recipeScope === "library"
+      ? `/shared/${recipe.id}`
+      : `/recipes/${recipe.id}`;
+
+  const recipeTags =
+    recipe.recipeScope === "library"
+      ? []
+      : tags.filter((t) => recipe.tags.includes(t.id));
+  const libraryTagNames =
+    recipe.recipeScope === "library" ? recipe.tagNames ?? [] : [];
+
+  const category =
+    recipe.recipeScope === "library"
+      ? recipe.categoryName
+        ? categories.find((c) => c.name === recipe.categoryName)
+        : undefined
+      : categories.find((c) => c.id === recipe.categoryId);
 
   return (
     <Link
-      to={`/recipes/${recipe.id}`}
+      to={recipeLink}
       className="group flex flex-col overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm transition-all hover:shadow-md hover:border-stone-300"
     >
       {/* Image */}
-      <div className="aspect-[4/3] overflow-hidden bg-stone-100">
+      <div className="relative aspect-[4/3] overflow-hidden bg-stone-100">
+        {recipe.recipeScope === "library" && (
+          <div className="absolute right-2 top-2 z-10">
+            <RecipeScopeBadge scope={recipe.recipeScope} variant="onImage" />
+          </div>
+        )}
         {recipe.imageUrls.length > 0 ? (
           <img
             src={recipe.imageUrls[0]}
@@ -64,7 +86,9 @@ export function RecipeCard({ recipe, tags, categories = [] }: RecipeCardProps) {
         )}
 
         {/* Category + Tags */}
-        {(category || recipeTags.length > 0) && (
+        {(category ||
+          recipeTags.length > 0 ||
+          libraryTagNames.length > 0) && (
           <div className="mt-2 sm:mt-3 flex flex-wrap gap-1.5">
             {category && (
               <button
@@ -80,20 +104,36 @@ export function RecipeCard({ recipe, tags, categories = [] }: RecipeCardProps) {
                 <span className="hidden sm:inline">{category.name}</span>
               </button>
             )}
+            {recipe.recipeScope === "library" &&
+              recipe.categoryName &&
+              !category && (
+                <span className="inline-flex items-center gap-1 rounded-full border border-stone-200 bg-stone-50 px-2 py-0.5 text-[11px] font-medium text-stone-600">
+                  <span className="hidden sm:inline">{recipe.categoryName}</span>
+                </span>
+              )}
             {recipeTags.slice(0, 2).map((tag) => (
               <TagChip key={tag.id} name={tag.name} color={tag.color} />
+            ))}
+            {libraryTagNames.slice(0, 2).map((name) => (
+              <TagChip key={name} name={name} color="#78716c" />
             ))}
             <span className="hidden sm:contents">
               {recipeTags.slice(2, 3).map((tag) => (
                 <TagChip key={tag.id} name={tag.name} color={tag.color} />
               ))}
             </span>
-            {recipeTags.length > 3 && (
+            <span className="hidden sm:contents">
+              {libraryTagNames.slice(2, 3).map((name) => (
+                <TagChip key={name} name={name} color="#78716c" />
+              ))}
+            </span>
+            {(recipeTags.length > 3 || libraryTagNames.length > 3) && (
               <span className="text-xs text-stone-400">
-                +{recipeTags.length - 3}
+                +
+                {Math.max(recipeTags.length, libraryTagNames.length) - 3}
               </span>
             )}
-            {recipeTags.length === 3 && (
+            {recipeTags.length === 3 && libraryTagNames.length === 0 && (
               <span className="sm:hidden text-xs text-stone-400">
                 +1
               </span>

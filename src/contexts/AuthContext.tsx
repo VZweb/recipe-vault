@@ -11,6 +11,7 @@ import {
   GoogleAuthProvider,
   createUserWithEmailAndPassword,
   onAuthStateChanged,
+  onIdTokenChanged,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signInWithPopup,
@@ -27,8 +28,12 @@ type AuthContextValue = {
   loading: boolean;
   /** From ID token custom claim `catalogAdmin` (see `scripts/set-catalog-admin-claim.mjs`). */
   catalogAdmin: boolean;
+  /** From ID token custom claim `recipeLibraryAdmin` (see `scripts/set-recipe-library-admin-claim.mjs`). */
+  recipeLibraryAdmin: boolean;
   /** True until the first `getIdTokenResult` for the current user finishes. */
   claimsLoading: boolean;
+  /** Forces a token refresh and re-reads custom claims (e.g. after `recipeLibraryAdmin` is granted). */
+  refreshClaims: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
@@ -45,6 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [catalogAdmin, setCatalogAdmin] = useState(false);
+  const [recipeLibraryAdmin, setRecipeLibraryAdmin] = useState(false);
   const [claimsLoading, setClaimsLoading] = useState(true);
 
   useEffect(() => {
@@ -55,25 +61,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!user) {
-      setCatalogAdmin(false);
-      setClaimsLoading(false);
-      return;
-    }
-    let cancelled = false;
-    setClaimsLoading(true);
-    void user
-      .getIdToken(true)
-      .then(() => user.getIdTokenResult())
-      .then((r) => {
-        if (cancelled) return;
-        setCatalogAdmin(r.claims.catalogAdmin === true);
+    const unsub = onIdTokenChanged(auth, async (nextUser) => {
+      if (!nextUser) {
+        setCatalogAdmin(false);
+        setRecipeLibraryAdmin(false);
         setClaimsLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [user]);
+        return;
+      }
+      setClaimsLoading(true);
+      try {
+        const r = await nextUser.getIdTokenResult();
+        setCatalogAdmin(r.claims.catalogAdmin === true);
+        setRecipeLibraryAdmin(r.claims.recipeLibraryAdmin === true);
+      } catch {
+        setCatalogAdmin(false);
+        setRecipeLibraryAdmin(false);
+      } finally {
+        setClaimsLoading(false);
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  const refreshClaims = useCallback(async () => {
+    const u = auth.currentUser;
+    if (!u) return;
+    setClaimsLoading(true);
+    try {
+      await u.getIdToken(true);
+      const r = await u.getIdTokenResult();
+      setCatalogAdmin(r.claims.catalogAdmin === true);
+      setRecipeLibraryAdmin(r.claims.recipeLibraryAdmin === true);
+    } catch {
+      setCatalogAdmin(false);
+      setRecipeLibraryAdmin(false);
+    } finally {
+      setClaimsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -116,7 +141,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       loading,
       catalogAdmin,
+      recipeLibraryAdmin,
       claimsLoading,
+      refreshClaims,
       signInWithEmail,
       signUpWithEmail,
       signInWithGoogle,
@@ -127,7 +154,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       loading,
       catalogAdmin,
+      recipeLibraryAdmin,
       claimsLoading,
+      refreshClaims,
       signInWithEmail,
       signUpWithEmail,
       signInWithGoogle,

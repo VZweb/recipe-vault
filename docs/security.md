@@ -14,14 +14,21 @@ User-created master ingredients live in **`users/{uid}/customIngredients`** and 
 
 After granting `catalogAdmin`, that user should **sign out and back in** (or otherwise refresh the ID token) so the claim appears in `getIdTokenResult()` and in rule evaluation.
 
+### Shared recipe library
+
+Top-level **`sharedRecipes`** holds recipes visible to **every signed-in user**. **Create, update, and delete** require the Auth custom claim **`recipeLibraryAdmin: true`** (set with `node scripts/set-recipe-library-admin-claim.mjs --uid=YOUR_AUTH_UID` using the Admin SDK service account). Per-user **times cooked** for library recipes is stored under **`users/{uid}/libraryRecipeProgress/{recipeId}`** and is readable/writable only by that user.
+
+After granting `recipeLibraryAdmin`, that user should **sign out and back in** (or refresh the ID token) so the claim appears in the client and in Storage/Firestore rule evaluation.
+
 ### Storage
 
-Paths are user-scoped:
+Paths are user-scoped unless noted:
 
-- Recipe images: `recipes/{uid}/files/...`
+- Recipe images (vault): `recipes/{uid}/files/...`
+- Recipe images (shared library): `recipes/library/{recipeId}/...` — any signed-in user may **read**; **write** requires `recipeLibraryAdmin` (see [`storage.rules`](../storage.rules)).
 - Pantry images: `pantry/{uid}/{itemId}/...`
 
-Rules allow read/write only when `request.auth.uid` matches the path segment.
+Rules allow vault/pantry read/write only when `request.auth.uid` matches the path segment (or library rules above).
 
 ## Operations notes
 

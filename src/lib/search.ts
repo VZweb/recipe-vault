@@ -22,10 +22,16 @@ export function buildSearchIndex(
 
   const searchable: SearchableRecipe[] = recipes.map((r) => ({
     ...r,
-    tagNames: r.tags
-      .map((tid) => tagMap.get(tid))
-      .filter((n): n is string => !!n),
-    categoryName: (r.categoryId && catMap.get(r.categoryId)) || "",
+    tagNames:
+      r.recipeScope === "library"
+        ? r.tagNames ?? []
+        : r.tags
+            .map((tid) => tagMap.get(tid))
+            .filter((n): n is string => !!n),
+    categoryName:
+      r.recipeScope === "library"
+        ? (r.categoryName ?? "")
+        : (r.categoryId && catMap.get(r.categoryId)) || "",
     ingredientNames: r.ingredients
       .filter((i) => !i.isSection)
       .flatMap((i) => {
