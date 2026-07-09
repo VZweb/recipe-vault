@@ -146,6 +146,26 @@ function parseLine(raw: string): { name: string; quantity: number | null; unit: 
   return { name: cleaned || clean, quantity: null, unit: "", note };
 }
 
+export function linkIngredientToCatalog(
+  rawName: string,
+  catalog: MasterIngredient[],
+): Pick<
+  Ingredient,
+  "name" | "nameSecondary" | "masterIngredientId" | "masterIngredientScope"
+> {
+  const match = findCatalogMatch(rawName, catalog);
+  return {
+    name: match?.name ?? rawName,
+    nameSecondary: match?.nameGr ?? "",
+    masterIngredientId: match?.id ?? null,
+    masterIngredientScope: match
+      ? match.isCatalog === false
+        ? "custom"
+        : "catalog"
+      : null,
+  };
+}
+
 function findCatalogMatch(
   rawName: string,
   catalog: MasterIngredient[],
@@ -211,20 +231,13 @@ export function parseIngredientText(
     }
 
     const parsed = parseLine(line);
-    const match = findCatalogMatch(parsed.name, catalog);
+    const linked = linkIngredientToCatalog(parsed.name, catalog);
 
     results.push({
-      name: match?.name ?? parsed.name,
-      nameSecondary: match?.nameGr ?? "",
+      ...linked,
       quantity: parsed.quantity,
       unit: parsed.unit,
       sortOrder,
-      masterIngredientId: match?.id ?? null,
-      masterIngredientScope: match
-        ? match.isCatalog === false
-          ? "custom"
-          : "catalog"
-        : null,
       substituteLinks: [],
       note: parsed.note,
       isSection: false,

@@ -1,20 +1,23 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { flushSync } from "react-dom";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
-import { Check, ChefHat, Clock, ClipboardCopy, Info, Link2, Percent, Users } from "lucide-react";
-import { useRecipes } from "@/hooks/useRecipes";
+import { Check, ChefHat, Clock, ClipboardCopy, ClipboardPaste, Info, Link2, Percent, Users } from "lucide-react";
+import { useRecipes, useRecipeMutations } from "@/hooks/useRecipes";
+import { useAuth } from "@/contexts/AuthContext";
 import { useTags } from "@/hooks/useTags";
 import { useIngredients } from "@/hooks/useIngredients";
 import { fetchPantryItems } from "@/lib/firestore";
 import { suggestRecipes, type SuggestionResult } from "@/lib/suggestions";
+import { buildChatGptRecipePrompt } from "@/lib/chatgptRecipeImport";
 import { Button } from "@/components/ui/Button";
 import { RecipeScopeBadge } from "@/components/recipe/RecipeScopeBadge";
+import { ImportRecipeDialog, type ImportSaveTarget } from "@/components/recipe/ImportRecipeDialog";
+import type { RecipeFormData } from "@/types/recipe";
 import { TagChip } from "@/components/ui/TagChip";
 import { Spinner } from "@/components/ui/Spinner";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { IngredientAutocomplete } from "@/components/ui/IngredientAutocomplete";
 import type { PantryItem } from "@/types/pantry";
-import { PANTRY_CATEGORIES } from "@/types/pantry";
 import type { MasterIngredientScope } from "@/types/ingredientRef";
 import {
   ingredientLinkKey,
@@ -56,6 +59,19 @@ export function SuggestionsPage() {
     masterIngredientScope: null,
   });
   const [copied, setCopied] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const { create, createShared } = useRecipeMutations();
+  const { recipeLibraryAdmin } = useAuth();
+
+  const handleImportSave = useCallback(
+    async (data: RecipeFormData, target: ImportSaveTarget) => {
+      if (target === "library") {
+        return createShared(data, [], null);
+      }
+      return create(data);
+    },
+    [create, createShared],
+  );
 
   const loadPantry = useCallback(async () => {
     setLoadingPantry(true);
@@ -293,53 +309,10 @@ export function SuggestionsPage() {
     });
   };
 
-  const buildRecipePrompt = useCallback(() => {
-    const staples = pantryItems.filter((i) => i.isStaple);
-    const regular = pantryItems.filter((i) => !i.isStaple);
-
-    const formatItem = (item: PantryItem) => {
-      let s = item.name;
-      if (item.quantity != null || item.unit) {
-        const parts = [item.quantity?.toString(), item.unit].filter(Boolean).join(" ");
-        s += ` (${parts})`;
-      }
-      return s;
-    };
-
-    const byCategory = PANTRY_CATEGORIES.reduce((acc, cat) => {
-      const catItems = regular.filter((i) => i.category === cat);
-      if (catItems.length > 0) acc[cat] = catItems;
-      return acc;
-    }, {} as Record<string, PantryItem[]>);
-
-    const lines: string[] = [
-      "I have the following ingredients in my pantry:",
-      "",
-    ];
-
-    for (const [cat, catItems] of Object.entries(byCategory)) {
-      lines.push(`${cat}: ${catItems.map(formatItem).join(", ")}`);
-    }
-
-    if (uniqueExtraIngredients.length > 0) {
-      lines.push("");
-      lines.push(
-        `Extra ingredients I also have: ${uniqueExtraIngredients.map((e) => e.name).join(", ")}`
-      );
-    }
-
-    if (staples.length > 0) {
-      lines.push("");
-      lines.push(
-        `Staples (always available): ${staples.map(formatItem).join(", ")}`
-      );
-    }
-
-    lines.push("");
-    lines.push("Suggest 1 recipe I can make with these ingredients.");
-
-    return lines.join("\n");
-  }, [pantryItems, uniqueExtraIngredients]);
+  const buildRecipePrompt = useCallback(
+    () => buildChatGptRecipePrompt(pantryItems, uniqueExtraIngredients),
+    [pantryItems, uniqueExtraIngredients],
+  );
 
   const handleCopyPrompt = async () => {
     const prompt = buildRecipePrompt();
@@ -359,23 +332,33 @@ export function SuggestionsPage() {
           ingredients you add below.
         </p>
         {pantryItems.length > 0 && (
-          <button
-            onClick={handleCopyPrompt}
-            className="flex-shrink-0 flex items-center gap-1.5 rounded-lg bg-stone-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-stone-700 transition-colors"
-            title="Copy a ChatGPT prompt with all your pantry items"
-          >
-            {copied ? (
-              <>
-                <Check size={14} className="text-emerald-400" />
-                Copied!
-              </>
-            ) : (
-              <>
-                <ClipboardCopy size={14} />
-                Ask ChatGPT
-              </>
-            )}
-          </button>
+          <div className="flex flex-shrink-0 items-center gap-2">
+            <button
+              onClick={() => setImportOpen(true)}
+              className="flex items-center gap-1.5 rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-50 transition-colors"
+              title="Import a recipe from a ChatGPT reply"
+            >
+              <ClipboardPaste size={14} />
+              Import recipe
+            </button>
+            <button
+              onClick={handleCopyPrompt}
+              className="flex items-center gap-1.5 rounded-lg bg-stone-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-stone-700 transition-colors"
+              title="Copy a ChatGPT prompt with all your pantry items"
+            >
+              {copied ? (
+                <>
+                  <Check size={14} className="text-emerald-400" />
+                  Copied!
+                </>
+              ) : (
+                <>
+                  <ClipboardCopy size={14} />
+                  Ask ChatGPT
+                </>
+              )}
+            </button>
+          </div>
         )}
       </div>
 
@@ -465,6 +448,14 @@ export function SuggestionsPage() {
           </button>
         </div>
       )}
+
+      <ImportRecipeDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        masterIngredients={masterIngredients}
+        recipeLibraryAdmin={recipeLibraryAdmin}
+        onSave={handleImportSave}
+      />
 
       {/* Results */}
       {loading ? (

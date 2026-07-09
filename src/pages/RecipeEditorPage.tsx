@@ -78,7 +78,8 @@ const defaultForm: RecipeFormData = {
 
 export function RecipeEditorPage() {
   const { id } = useParams<{ id: string }>();
-  const { pathname } = useLocation();
+  const location = useLocation();
+  const { pathname } = location;
   const isLibraryEdit = /^\/shared\/[^/]+\/edit$/.test(pathname);
   const recipeScope = isLibraryEdit ? "library" : "vault";
   const isEditing = Boolean(id);
@@ -130,6 +131,28 @@ export function RecipeEditorPage() {
   useEffect(() => {
     if (pathname.endsWith("/recipes/new")) void refreshClaims();
   }, [pathname, refreshClaims]);
+
+  /** Seed form from ChatGPT import when navigating via Edit first. */
+  useEffect(() => {
+    if (isEditing) return;
+    const state = location.state as {
+      importDraft?: RecipeFormData;
+      importSaveToSharedLibrary?: boolean;
+    } | null;
+    const draft = state?.importDraft;
+    if (!draft) return;
+    setForm(draft);
+    setPreviewImages(draft.imageUrls);
+    if (state?.importSaveToSharedLibrary) {
+      setSaveToSharedLibrary(true);
+    }
+    const openNotes = new Set<number>();
+    draft.ingredients.forEach((ing, i) => {
+      if (ing.note) openNotes.add(i);
+    });
+    setNoteOpenSet(openNotes);
+    navigate(pathname, { replace: true, state: {} });
+  }, [isEditing, location.state, navigate, pathname]);
 
   /** Scroll to top when the editor replaces the loading state (avoids mid-page viewport). */
   useLayoutEffect(() => {
